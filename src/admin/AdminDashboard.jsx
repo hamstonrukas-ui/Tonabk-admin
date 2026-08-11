@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { API_URL } from "../lib/api";
 
 function StatCard({ label, value }) {
   return (
@@ -16,19 +17,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     async function charger() {
-      const [boutiquesEnAttente, maisonsDispo, requetesOuvertes, reponsesNonLues] = await Promise.all([
-        supabase.from("boutiques").select("id", { count: "exact", head: true }).eq("statut", "en_attente"),
-        supabase.from("maisons").select("id", { count: "exact", head: true }).eq("statut", "disponible"),
-        supabase.from("requetes").select("id", { count: "exact", head: true }).eq("statut", "ouverte"),
-        supabase.from("reponses_requetes").select("id", { count: "exact", head: true }).eq("vue", false),
-      ]);
-
-      setStats({
-        boutiquesEnAttente: boutiquesEnAttente.count,
-        maisonsDispo: maisonsDispo.count,
-        requetesOuvertes: requetesOuvertes.count,
-        reponsesNonLues: reponsesNonLues.count,
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin-stats`, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
       });
+      if (res.ok) setStats(await res.json());
     }
     charger();
 
@@ -77,4 +70,5 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
-}
+    }
+            
