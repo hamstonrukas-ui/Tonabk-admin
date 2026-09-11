@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
 
@@ -50,11 +50,13 @@ export default function AdminDashboard() {
   return (
     <div>
       <h1>Vue d'ensemble</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 16 }}>
         <StatCard label="Boutiques à valider" value={stats.boutiquesEnAttente ?? "—"} />
         <StatCard label="Maisons disponibles" value={stats.maisonsDispo ?? "—"} />
         <StatCard label="Requêtes ouvertes" value={stats.requetesOuvertes ?? "—"} />
         <StatCard label="Réponses non lues" value={stats.reponsesNonLues ?? "—"} />
+        <StatCard label="Visiteurs (24h)" value={stats.visites24h ?? "—"} />
+        <StatCard label="Clics WhatsApp (24h)" value={stats.clicsWhatsapp24h ?? "—"} />
       </div>
 
       <h3 style={{ marginTop: 24 }}>Nouvelles réponses ({notifications.length})</h3>
@@ -72,3 +74,4 @@ export default function AdminDashboard() {
   );
     }
             
+    
