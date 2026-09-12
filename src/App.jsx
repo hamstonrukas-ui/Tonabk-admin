@@ -10,7 +10,7 @@ import RequireAdmin from "./admin/RequireAdmin";
 
 import AdminAnalytics from "./admin/AdminAnalytics";
 // ...
-<Route path="analytics" element={<AdminAnalytics />} />
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -28,6 +28,7 @@ export default function App() {
           <Route path="boutiques" element={<AdminBoutiques />} />
           <Route path="requetes" element={<AdminRequetes />} />
           <Route path="maisons" element={<AdminMaisons />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="parrainages" element={<AdminParrainages />} />
         </Route>
       </Routes>
