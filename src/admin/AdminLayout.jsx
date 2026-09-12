@@ -13,6 +13,7 @@ export default function AdminLayout() {
           <NavLink to="/parrainages">Parrainages</NavLink>
           <NavLink to="/parrainages">Parrainages</NavLink>
           <NavLink to="/parrainages">Parrainages</NavLink>
+          <NavLink to="/analytics">Statistiques</NavLink>
         </nav>
       </aside>
       <main style={{ flex: 1, padding: 24, background: "#F3F3F3" }}>
