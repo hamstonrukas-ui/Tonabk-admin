@@ -8,6 +8,9 @@ import AdminParrainages from "./admin/AdminParrainages";
 import AdminLogin from "./admin/AdminLogin";
 import RequireAdmin from "./admin/RequireAdmin";
 
+import AdminAnalytics from "./admin/AdminAnalytics";
+// ...
+<Route path="analytics" element={<AdminAnalytics />} />
 export default function App() {
   return (
     <BrowserRouter>
