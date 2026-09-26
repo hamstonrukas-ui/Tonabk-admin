@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
 
@@ -17,6 +18,9 @@ function BoutiqueRow({ boutique, onMarquerVue, onSuspendre, onReactiver, onSuppr
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link to={`/boutiques/${boutique.id}/produits`} style={{ background: "#F5720C", color: "#fff", padding: "6px 10px", borderRadius: 6, textDecoration: "none", fontSize: 13 }}>
+          Gérer les produits
+        </Link>
         <button onClick={() => onMarquerVue(boutique.id)}>Marquer comme examinée</button>
         <button onClick={() => onCertifier(boutique.id)}>Certifier (30j)</button>
         {boutique.statut === "actif" ? (
@@ -105,4 +109,5 @@ export default function AdminBoutiques() {
       </div>
     </div>
   );
-}
+            }
+    
