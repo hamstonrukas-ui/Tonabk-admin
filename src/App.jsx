@@ -2,14 +2,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AdminLayout from "./admin/AdminLayout";
 import AdminDashboard from "./admin/AdminDashboard";
 import AdminBoutiques from "./admin/AdminBoutiques";
+import AdminGererProduits from "./admin/AdminGererProduits";
 import AdminRequetes from "./admin/AdminRequetes";
 import AdminMaisons from "./admin/AdminMaisons";
 import AdminParrainages from "./admin/AdminParrainages";
 import AdminLogin from "./admin/AdminLogin";
 import RequireAdmin from "./admin/RequireAdmin";
-
-import AdminAnalytics from "./admin/AdminAnalytics";
-// ...
 
 export default function App() {
   return (
@@ -26,9 +24,9 @@ export default function App() {
         >
           <Route index element={<AdminDashboard />} />
           <Route path="boutiques" element={<AdminBoutiques />} />
+          <Route path="boutiques/:id/produits" element={<AdminGererProduits />} />
           <Route path="requetes" element={<AdminRequetes />} />
           <Route path="maisons" element={<AdminMaisons />} />
-          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="parrainages" element={<AdminParrainages />} />
         </Route>
       </Routes>
