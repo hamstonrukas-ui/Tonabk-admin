@@ -32,6 +32,8 @@ export default function AdminGererProduits() {
   const [nom, setNom] = useState("");
   const [prix, setPrix] = useState("");
   const [devise, setDevise] = useState("USD");
+  const [prixGros, setPrixGros] = useState("");
+  const [quantiteMinGros, setQuantiteMinGros] = useState("");
   const [stock, setStock] = useState("");
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState(null);
@@ -97,6 +99,8 @@ export default function AdminGererProduits() {
           nom: nom.trim(),
           prix: Number(prix),
           devise,
+          prix_gros: prixGros ? Number(prixGros) : null,
+          quantite_min_gros: prixGros && quantiteMinGros ? Number(quantiteMinGros) : null,
           stock: Number(stock) || 0,
           description,
           photo_url,
@@ -111,7 +115,7 @@ export default function AdminGererProduits() {
         return;
       }
 
-      setNom(""); setPrix(""); setDevise("USD"); setStock(""); setDescription(""); setPhoto(null);
+      setNom(""); setPrix(""); setDevise("USD"); setPrixGros(""); setQuantiteMinGros(""); setStock(""); setDescription(""); setPhoto(null);
       charger();
     } catch (err) {
       setErreur(
@@ -155,6 +159,23 @@ export default function AdminGererProduits() {
             <option value="CDF">CDF</option>
           </select>
         </div>
+
+        <div style={{ background: "#F6F6F6", borderRadius: 8, padding: 10 }}>
+          <p style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+            Prix de gros (optionnel) — laissez vide si le vendeur vend uniquement au détail
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={prixGros} onChange={(e) => setPrixGros(e.target.value)} type="number"
+              placeholder={`Prix de gros (${devise})`} style={{ flex: 1 }}
+            />
+            <input
+              value={quantiteMinGros} onChange={(e) => setQuantiteMinGros(e.target.value)} type="number"
+              placeholder="Qté min." disabled={!prixGros} style={{ width: 90 }}
+            />
+          </div>
+        </div>
+
         <input value={stock} onChange={(e) => setStock(e.target.value)} type="number" placeholder="Stock" />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={2} />
         <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files[0])} />
@@ -178,5 +199,4 @@ export default function AdminGererProduits() {
       </div>
     </div>
   );
-      }
-          
+}
