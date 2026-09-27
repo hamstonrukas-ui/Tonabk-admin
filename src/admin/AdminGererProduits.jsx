@@ -10,6 +10,16 @@ async function authHeaders(json = true) {
     : { Authorization: `Bearer ${session?.access_token}` };
 }
 
+async function fetchAvecDelai(url, options = {}, delaiMs = 15000) {
+  const controleur = new AbortController();
+  const minuteur = setTimeout(() => controleur.abort(), delaiMs);
+  try {
+    return await fetch(url, { ...options, signal: controleur.signal });
+  } finally {
+    clearTimeout(minuteur);
+  }
+}
+
 const fmt = (n, devise = "USD") => Number(n).toLocaleString("fr-FR") + " " + devise;
 
 export default function AdminGererProduits() {
@@ -29,13 +39,18 @@ export default function AdminGererProduits() {
 
   async function charger() {
     setChargement(true);
-    const headers = await authHeaders();
-    const [resB, resP] = await Promise.all([
-      fetch(`${API_URL}/api/boutiques/${id}`),
-      fetch(`${API_URL}/api/produits?boutique_id=${id}`),
-    ]);
-    if (resB.ok) setBoutique(await resB.json());
-    if (resP.ok) setProduits(await resP.json());
+    setErreur("");
+    try {
+      const headers = await authHeaders();
+      const [resB, resP] = await Promise.all([
+        fetchAvecDelai(`${API_URL}/api/boutiques/${id}`),
+        fetchAvecDelai(`${API_URL}/api/produits?boutique_id=${id}`),
+      ]);
+      if (resB.ok) setBoutique(await resB.json());
+      if (resP.ok) setProduits(await resP.json());
+    } catch (err) {
+      setErreur(err.name === "AbortError" ? "Le serveur met trop de temps à répondre." : "Connexion au serveur impossible.");
+    }
     setChargement(false);
   }
 
@@ -56,7 +71,7 @@ export default function AdminGererProduits() {
         formData.append("photo", photo);
         formData.append("boutiqueId", id);
 
-        const resUpload = await fetch(`${API_URL}/api/upload/photo`, {
+        const resUpload = await fetchAvecDelai(`${API_URL}/api/upload/photo`, {
           method: "POST",
           headers: headersUpload,
           body: formData,
@@ -74,7 +89,7 @@ export default function AdminGererProduits() {
       }
 
       const headers = await authHeaders();
-      const res = await fetch(`${API_URL}/api/produits`, {
+      const res = await fetchAvecDelai(`${API_URL}/api/produits`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -98,8 +113,12 @@ export default function AdminGererProduits() {
 
       setNom(""); setPrix(""); setDevise("USD"); setStock(""); setDescription(""); setPhoto(null);
       charger();
-    } catch {
-      setErreur("Une erreur est survenue. Vérifiez la connexion.");
+    } catch (err) {
+      setErreur(
+        err.name === "AbortError"
+          ? "Le serveur met trop de temps à répondre. Réessayez dans un instant."
+          : "Une erreur est survenue. Vérifiez la connexion."
+      );
     }
     setEnvoiEnCours(false);
   };
@@ -107,7 +126,7 @@ export default function AdminGererProduits() {
   const supprimerProduit = async (produitId) => {
     if (!confirm("Supprimer ce produit ?")) return;
     const headers = await authHeaders();
-    await fetch(`${API_URL}/api/produits/${produitId}`, { method: "DELETE", headers });
+    await fetchAvecDelai(`${API_URL}/api/produits/${produitId}`, { method: "DELETE", headers });
     charger();
   };
 
@@ -159,5 +178,5 @@ export default function AdminGererProduits() {
       </div>
     </div>
   );
-    }
-    
+      }
+          
