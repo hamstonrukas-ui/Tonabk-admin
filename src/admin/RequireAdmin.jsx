@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { obtenirRole } from "../lib/role";
+import { RoleContext } from "./RoleContext";
 
 export default function RequireAdmin({ children }) {
-  const [autorise, setAutorise] = useState(null);
+  const [role, setRole] = useState(undefined); // undefined = en cours de vérification
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const role = data.user?.app_metadata?.role || data.user?.user_metadata?.role;
-      setAutorise(role === "admin");
-    });
+    supabase.auth.getUser().then(({ data }) => setRole(obtenirRole(data.user)));
   }, []);
 
-  if (autorise === null) return <p style={{ textAlign: "center", fontSize: 13, color: "#999", padding: 40 }}>Chargement...</p>;
-  if (!autorise) return <Navigate to="/connexion" replace />;
-  return children;
+  if (role === undefined) return <p style={{ textAlign: "center", fontSize: 13, color: "#999", padding: 40 }}>Chargement...</p>;
+  if (!role) return <Navigate to="/connexion" replace />;
+  return <RoleContext.Provider value={role}>{children}</RoleContext.Provider>;
 }
