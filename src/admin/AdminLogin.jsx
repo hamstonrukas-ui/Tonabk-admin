@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { obtenirRole } from "../lib/role";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -21,10 +22,10 @@ export default function AdminLogin() {
       return setErreur("Email ou mot de passe incorrect");
     }
 
-    const role = data.user?.app_metadata?.role || data.user?.user_metadata?.role;
+    const role = obtenirRole(data.user);
     setLoading(false);
 
-    if (role !== "admin") {
+    if (!role) {
       await supabase.auth.signOut();
       return setErreur("Ce compte n'a pas les droits administrateur");
     }
@@ -56,4 +57,5 @@ export default function AdminLogin() {
       </form>
     </div>
   );
-}
+  }
+      
