@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
+import { reduireImage } from "../lib/image";
 
 async function authHeaders(json = true) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -39,6 +40,97 @@ export default function AdminGererProduits() {
   const [photo, setPhoto] = useState(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
 
+  const MAX_PAR_LOT = 10;
+  const [afficherLot, setAfficherLot] = useState(false);
+  const [deviseLot, setDeviseLot] = useState("USD");
+  const [lignesLot, setLignesLot] = useState([]); // { id, fichier, apercu, nom, prix, erreur }
+  const [lotEnCours, setLotEnCours] = useState(false);
+  const [lotProgression, setLotProgression] = useState(0);
+  const [lotTotal, setLotTotal] = useState(0);
+
+  const choisirPhotosLot = (e) => {
+    const fichiers = Array.from(e.target.files || []).slice(0, MAX_PAR_LOT - lignesLot.length);
+    const nouvelles = fichiers.map((f, i) => ({
+      id: `${Date.now()}-${i}`,
+      fichier: f,
+      apercu: URL.createObjectURL(f),
+      nom: "",
+      prix: "",
+      erreur: "",
+    }));
+    setLignesLot((prev) => [...prev, ...nouvelles]);
+    e.target.value = "";
+  };
+
+  const majLigneLot = (lid, champ, valeur) =>
+    setLignesLot((prev) => prev.map((l) => (l.id === lid ? { ...l, [champ]: valeur } : l)));
+
+  const retirerLigneLot = (lid) => setLignesLot((prev) => prev.filter((l) => l.id !== lid));
+
+  const publierLot = async () => {
+    const incompletes = lignesLot.filter((l) => !l.nom.trim() || !l.prix);
+    if (incompletes.length) {
+      setLignesLot((prev) =>
+        prev.map((l) => (!l.nom.trim() || !l.prix ? { ...l, erreur: "Nom et prix requis" } : { ...l, erreur: "" }))
+      );
+      return;
+    }
+
+    setLotEnCours(true);
+    setLotTotal(lignesLot.length);
+    setLotProgression(0);
+    const restantes = [];
+
+    for (const ligne of lignesLot) {
+      try {
+        const headersUpload = await authHeaders(false);
+        const photoReduite = await reduireImage(ligne.fichier);
+        const formData = new FormData();
+        formData.append("photo", photoReduite);
+        formData.append("boutiqueId", id);
+
+        const resUpload = await fetchAvecDelai(`${API_URL}/api/upload/photo`, {
+          method: "POST", headers: headersUpload, body: formData,
+        });
+        if (!resUpload.ok) {
+          const data = await resUpload.json().catch(() => ({}));
+          throw new Error(data.message || data.error || "Échec de l'envoi de la photo");
+        }
+        const { url } = await resUpload.json();
+
+        const headersJson = await authHeaders();
+        const res = await fetchAvecDelai(`${API_URL}/api/produits`, {
+          method: "POST",
+          headers: headersJson,
+          body: JSON.stringify({
+            boutique_id: id,
+            nom: ligne.nom.trim(),
+            prix: Number(ligne.prix),
+            devise: deviseLot,
+            stock: 0,
+            description: "",
+            photo_url: url,
+            photo_thumb_url: url,
+            prix_gros: null,
+            quantite_min_gros: null,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Échec de l'ajout du produit");
+        }
+      } catch (err) {
+        restantes.push({ ...ligne, erreur: err.message || "Erreur" });
+      }
+      setLotProgression((p) => p + 1);
+    }
+
+    setLotEnCours(false);
+    setLignesLot(restantes);
+    charger();
+    if (restantes.length === 0) setAfficherLot(false);
+  };
+
   async function charger() {
     setChargement(true);
     setErreur("");
@@ -69,8 +161,9 @@ export default function AdminGererProduits() {
 
       if (photo) {
         const headersUpload = await authHeaders(false);
+        const photoReduite = await reduireImage(photo);
         const formData = new FormData();
-        formData.append("photo", photo);
+        formData.append("photo", photoReduite);
         formData.append("boutiqueId", id);
 
         const resUpload = await fetchAvecDelai(`${API_URL}/api/upload/photo`, {
@@ -145,6 +238,59 @@ export default function AdminGererProduits() {
         Tu ajoutes ici un produit pour le compte du commerçant — utile pour l'aider en direct
         (par téléphone ou sur place) s'il n'est pas à l'aise avec l'app.
       </p>
+
+      <button
+        onClick={() => setAfficherLot(!afficherLot)}
+        style={{ background: "#F5720C1A", color: "#F5720C", border: "none", borderRadius: 6, padding: "8px 14px", fontWeight: 600, fontSize: 13, marginBottom: 12 }}
+      >
+        {afficherLot ? "Fermer l'ajout en lot" : "+ Ajouter plusieurs produits d'un coup"}
+      </button>
+
+      {afficherLot && (
+        <div style={{ background: "#fff", borderRadius: 10, padding: 16, marginBottom: 20, maxWidth: 420, display: "flex", flexDirection: "column", gap: 8 }}>
+          <p style={{ fontSize: 12, color: "#666" }}>
+            Choisissez jusqu'à {MAX_PAR_LOT} photos, donnez un nom et un prix à chacune, puis publiez-les toutes en un clic.
+          </p>
+
+          {lignesLot.length < MAX_PAR_LOT && (
+            <label style={{ textAlign: "center", border: "2px dashed #F5720C66", borderRadius: 8, padding: 14, fontSize: 13, fontWeight: 600, color: "#F5720C", cursor: "pointer" }}>
+              {lignesLot.length === 0 ? `Choisir jusqu'à ${MAX_PAR_LOT} photos` : "Ajouter d'autres photos"}
+              <input type="file" accept="image/*" multiple onChange={choisirPhotosLot} style={{ display: "none" }} disabled={lotEnCours} />
+            </label>
+          )}
+
+          {lignesLot.length > 0 && (
+            <>
+              <select value={deviseLot} onChange={(e) => setDeviseLot(e.target.value)} disabled={lotEnCours}>
+                <option value="USD">Tous les prix en USD ($)</option>
+                <option value="CDF">Tous les prix en CDF (FC)</option>
+              </select>
+
+              {lignesLot.map((l) => (
+                <div key={l.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <img src={l.apercu} alt="" style={{ width: 52, height: 52, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <input value={l.nom} onChange={(e) => majLigneLot(l.id, "nom", e.target.value)} placeholder="Nom du produit" disabled={lotEnCours} />
+                    <input value={l.prix} onChange={(e) => majLigneLot(l.id, "prix", e.target.value)} type="number" placeholder="Prix" disabled={lotEnCours} />
+                    {l.erreur && <p style={{ fontSize: 11, color: "red", margin: 0 }}>{l.erreur}</p>}
+                  </div>
+                  {!lotEnCours && (
+                    <button onClick={() => retirerLigneLot(l.id)} style={{ color: "#999", background: "none", border: "none" }}>✕</button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                onClick={publierLot}
+                disabled={lotEnCours}
+                style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}
+              >
+                {lotEnCours ? `Publication ${lotProgression}/${lotTotal}...` : `Publier ${lignesLot.length} produit${lignesLot.length > 1 ? "s" : ""}`}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={ajouterProduit}
