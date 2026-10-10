@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
@@ -39,6 +39,18 @@ export default function AdminGererProduits() {
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+
+  const [editId, setEditId] = useState(null);
+  const [editNom, setEditNom] = useState("");
+  const [editPrix, setEditPrix] = useState("");
+  const [editDevise, setEditDevise] = useState("USD");
+  const [editPrixGros, setEditPrixGros] = useState("");
+  const [editQuantiteMinGros, setEditQuantiteMinGros] = useState("");
+  const [editStock, setEditStock] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPhoto, setEditPhoto] = useState(null);
+  const [editEnvoiEnCours, setEditEnvoiEnCours] = useState(false);
+  const [editErreur, setEditErreur] = useState("");
 
   const MAX_PAR_LOT = 10;
   const [afficherLot, setAfficherLot] = useState(false);
@@ -220,6 +232,85 @@ export default function AdminGererProduits() {
     setEnvoiEnCours(false);
   };
 
+  const ouvrirEdition = (p) => {
+    setEditId(p.id);
+    setEditNom(p.nom);
+    setEditPrix(p.prix);
+    setEditDevise(p.devise || "USD");
+    setEditPrixGros(p.prix_gros || "");
+    setEditQuantiteMinGros(p.quantite_min_gros || "");
+    setEditStock(p.stock ?? "");
+    setEditDescription(p.description || "");
+    setEditPhoto(null);
+    setEditErreur("");
+  };
+
+  const modifierProduit = async (e) => {
+    e.preventDefault();
+    setEditErreur("");
+    if (!editNom.trim() || !editPrix) { setEditErreur("Nom et prix requis"); return; }
+    setEditEnvoiEnCours(true);
+
+    try {
+      let photo_url, photo_thumb_url;
+
+      if (editPhoto) {
+        const headersUpload = await authHeaders(false);
+        const photoReduite = await reduireImage(editPhoto);
+        const formData = new FormData();
+        formData.append("photo", photoReduite);
+        formData.append("boutiqueId", id);
+
+        const resUpload = await fetchAvecDelai(`${API_URL}/api/upload/photo`, {
+          method: "POST", headers: headersUpload, body: formData,
+        });
+        if (!resUpload.ok) {
+          const data = await resUpload.json().catch(() => ({}));
+          setEditErreur(data.message || data.error || "Échec de l'upload de la photo");
+          setEditEnvoiEnCours(false);
+          return;
+        }
+        const dataUpload = await resUpload.json();
+        photo_url = dataUpload.url;
+        photo_thumb_url = dataUpload.url;
+      }
+
+      const headers = await authHeaders();
+      const res = await fetchAvecDelai(`${API_URL}/api/produits/${editId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          nom: editNom.trim(),
+          prix: Number(editPrix),
+          devise: editDevise,
+          prix_gros: editPrixGros ? Number(editPrixGros) : null,
+          quantite_min_gros: editPrixGros && editQuantiteMinGros ? Number(editQuantiteMinGros) : null,
+          stock: Number(editStock) || 0,
+          description: editDescription,
+          photo_url,
+          photo_thumb_url,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setEditErreur(data.error || "Échec de la modification");
+        setEditEnvoiEnCours(false);
+        return;
+      }
+
+      setEditId(null);
+      charger();
+    } catch (err) {
+      setEditErreur(
+        err.name === "AbortError"
+          ? "Le serveur met trop de temps à répondre. Réessayez dans un instant."
+          : "Une erreur est survenue. Vérifiez la connexion."
+      );
+    }
+    setEditEnvoiEnCours(false);
+  };
+
   const supprimerProduit = async (produitId) => {
     if (!confirm("Supprimer ce produit ?")) return;
     const headers = await authHeaders();
@@ -333,12 +424,67 @@ export default function AdminGererProduits() {
       <h2 style={{ fontSize: 15, marginBottom: 8 }}>Produits actuels ({produits.length})</h2>
       <div style={{ borderRadius: 10, overflow: "hidden" }}>
         {produits.map((p) => (
-          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, borderBottom: "1px solid #eee", background: "#fff" }}>
-            <div>
-              <strong>{p.nom}</strong> — {fmt(p.prix, p.devise)}
-              <div style={{ fontSize: 11, color: "#7A7A7A" }}>Stock : {p.stock}</div>
+          <div key={p.id} style={{ borderBottom: "1px solid #eee", background: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12 }}>
+              <div>
+                <strong>{p.nom}</strong> — {fmt(p.prix, p.devise)}
+                <div style={{ fontSize: 11, color: "#7A7A7A" }}>Stock : {p.stock}</div>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button style={{ color: "#F5720C" }} onClick={() => (editId === p.id ? setEditId(null) : ouvrirEdition(p))}>
+                  {editId === p.id ? "Annuler" : "Modifier"}
+                </button>
+                <button style={{ color: "red" }} onClick={() => supprimerProduit(p.id)}>Supprimer</button>
+              </div>
             </div>
-            <button style={{ color: "red" }} onClick={() => supprimerProduit(p.id)}>Supprimer</button>
+
+            {editId === p.id && (
+              <form
+                onSubmit={modifierProduit}
+                style={{ background: "#F9F9F9", padding: 16, display: "flex", flexDirection: "column", gap: 8 }}
+              >
+                {editErreur && <p style={{ color: "red", fontSize: 13 }}>{editErreur}</p>}
+                <input value={editNom} onChange={(e) => setEditNom(e.target.value)} placeholder="Nom du produit" required />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={editPrix} onChange={(e) => setEditPrix(e.target.value)} type="number" placeholder="Prix" required style={{ flex: 1 }} />
+                  <select value={editDevise} onChange={(e) => setEditDevise(e.target.value)}>
+                    <option value="USD">USD</option>
+                    <option value="CDF">CDF</option>
+                  </select>
+                </div>
+
+                <div style={{ background: "#fff", borderRadius: 8, padding: 10 }}>
+                  <p style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                    Prix de gros (optionnel) — laissez vide si le vendeur vend uniquement au détail
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={editPrixGros} onChange={(e) => setEditPrixGros(e.target.value)} type="number"
+                      placeholder={`Prix de gros (${editDevise})`} style={{ flex: 1 }}
+                    />
+                    <input
+                      value={editQuantiteMinGros} onChange={(e) => setEditQuantiteMinGros(e.target.value)} type="number"
+                      placeholder="Qté min." disabled={!editPrixGros} style={{ width: 90 }}
+                    />
+                  </div>
+                </div>
+
+                <input value={editStock} onChange={(e) => setEditStock(e.target.value)} type="number" placeholder="Stock" />
+                <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Description" rows={2} />
+
+                {p.photo_url && (
+                  <img src={p.photo_url} alt="" style={{ width: 60, height: 60, borderRadius: 6, objectFit: "cover" }} />
+                )}
+                <label style={{ fontSize: 12, color: "#666" }}>
+                  Remplacer la photo (laisser vide pour garder l'actuelle)
+                  <input type="file" accept="image/*" onChange={(e) => setEditPhoto(e.target.files[0])} />
+                </label>
+
+                <button type="submit" disabled={editEnvoiEnCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}>
+                  {editEnvoiEnCours ? "Enregistrement..." : "Enregistrer les modifications"}
+                </button>
+              </form>
+            )}
           </div>
         ))}
         {produits.length === 0 && <p style={{ padding: 16, color: "#999" }}>Aucun produit pour l'instant</p>}
