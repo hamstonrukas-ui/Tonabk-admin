@@ -1,4 +1,4 @@
-// "admin" = accès complet · "admin_secondaire" = boutiques + produits seulement · null = aucun accès
+// "admin" = accès complet ·ok "admin_secondaire" = boutiques + produits seulement · null = aucun accès
 export function obtenirRole(user) {
   const roleApp = user?.app_metadata?.role;
 
