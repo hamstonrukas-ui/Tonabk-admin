@@ -25,11 +25,22 @@ export default function AdminPresence() {
   const [erreur, setErreur] = useState("");
   const [activites, setActivites] = useState("");
   const [difficultes, setDifficultes] = useState("");
+  const [erreurChargement, setErreurChargement] = useState("");
 
   async function charger() {
-    const headers = await authHeaders();
-    const res = await fetch(`${API_URL}/api/presences/aujourdhui`, { headers });
-    if (res.ok) setPresence(await res.json());
+    setErreurChargement("");
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_URL}/api/presences/aujourdhui`, { headers });
+      if (res.ok) {
+        setPresence(await res.json());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErreurChargement(data.error || `Erreur ${res.status} du serveur`);
+      }
+    } catch {
+      setErreurChargement("Impossible de contacter le serveur (vérifiez VITE_API_URL et la connexion)");
+    }
   }
 
   useEffect(() => { charger(); }, []);
@@ -73,6 +84,18 @@ export default function AdminPresence() {
     }
     setEnCours(false);
   };
+
+  if (erreurChargement) {
+    return (
+      <div style={{ maxWidth: 420 }}>
+        <h1>Présence du jour</h1>
+        <p style={{ color: "red" }}>{erreurChargement}</p>
+        <button onClick={charger} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 20px", fontWeight: 600 }}>
+          Réessayer
+        </button>
+      </div>
+    );
+  }
 
   if (presence === undefined) return <p>Chargement...</p>;
 
