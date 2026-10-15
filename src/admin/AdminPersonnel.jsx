@@ -14,11 +14,22 @@ export default function AdminPersonnel() {
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
   const [dernierCree, setDernierCree] = useState(null);
+  const [erreurListe, setErreurListe] = useState("");
 
   async function charger() {
-    const headers = await authHeaders();
-    const res = await fetch(`${API_URL}/api/personnel`, { headers });
-    if (res.ok) setPersonnel(await res.json());
+    setErreurListe("");
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_URL}/api/personnel`, { headers });
+      if (res.ok) {
+        setPersonnel(await res.json());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErreurListe(data.error || `Erreur ${res.status} du serveur`);
+      }
+    } catch {
+      setErreurListe("Impossible de contacter le serveur (vérifiez VITE_API_URL et la connexion)");
+    }
   }
 
   useEffect(() => { charger(); }, []);
@@ -36,14 +47,20 @@ export default function AdminPersonnel() {
         headers,
         body: JSON.stringify({ nom, telephone }),
       });
-      const data = await res.json();
-      if (!res.ok) { setErreur(data.error || "Échec de la création"); setEnvoiEnCours(false); return; }
 
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErreur(data.error || `Erreur ${res.status} du serveur`);
+        setEnvoiEnCours(false);
+        return;
+      }
+
+      const data = await res.json();
       setDernierCree(data);
       setNom(""); setTelephone("");
       charger();
     } catch {
-      setErreur("Erreur de connexion");
+      setErreur("Impossible de contacter le serveur (vérifiez VITE_API_URL et la connexion)");
     }
     setEnvoiEnCours(false);
   };
@@ -86,8 +103,15 @@ export default function AdminPersonnel() {
         </div>
       )}
 
+      {erreurListe && (
+        <div style={{ background: "#fff", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <p style={{ color: "red", margin: "0 0 8px" }}>{erreurListe}</p>
+          <button onClick={charger} style={{ color: "#F5720C", background: "none", border: "none", fontWeight: 600 }}>Réessayer</button>
+        </div>
+      )}
+
       <div style={{ background: "#fff", borderRadius: 10, overflow: "hidden" }}>
-        {personnel.length === 0 && <p style={{ padding: 16, color: "#999" }}>Aucun membre du personnel pour l'instant.</p>}
+        {!erreurListe && personnel.length === 0 && <p style={{ padding: 16, color: "#999" }}>Aucun membre du personnel pour l'instant.</p>}
         {personnel.map((p) => (
           <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, borderBottom: "1px solid #eee" }}>
             <div>
