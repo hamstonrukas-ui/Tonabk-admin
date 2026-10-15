@@ -16,6 +16,8 @@ export default function AdminLayout() {
           {complet && <NavLink to="/requetes">Requêtes</NavLink>}
           {complet && <NavLink to="/maisons">Maisons</NavLink>}
           {complet && <NavLink to="/parrainages">Parrainages</NavLink>}
+          {complet && <NavLink to="/personnel">Personnel</NavLink>}
+          <NavLink to="/presence">Présence</NavLink>
         </nav>
       </aside>
       <main style={{ flex: 1, padding: 24, background: "#F3F3F3" }}>
@@ -23,4 +25,4 @@ export default function AdminLayout() {
       </main>
     </div>
   );
-        }
+}
