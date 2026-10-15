@@ -7,6 +7,8 @@ import AdminGererProduits from "./admin/AdminGererProduits";
 import AdminRequetes from "./admin/AdminRequetes";
 import AdminMaisons from "./admin/AdminMaisons";
 import AdminParrainages from "./admin/AdminParrainages";
+import AdminPersonnel from "./admin/AdminPersonnel";
+import AdminPresence from "./admin/AdminPresence";
 import AdminLogin from "./admin/AdminLogin";
 import RequireAdmin from "./admin/RequireAdmin";
 import { SeulementAdmin } from "./admin/RoleContext";
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="requetes" element={<SeulementAdmin><AdminRequetes /></SeulementAdmin>} />
           <Route path="maisons" element={<SeulementAdmin><AdminMaisons /></SeulementAdmin>} />
           <Route path="parrainages" element={<SeulementAdmin><AdminParrainages /></SeulementAdmin>} />
+          <Route path="personnel" element={<SeulementAdmin><AdminPersonnel /></SeulementAdmin>} />
+          <Route path="presence" element={<AdminPresence />} />
         </Route>
       </Routes>
     </BrowserRouter>
