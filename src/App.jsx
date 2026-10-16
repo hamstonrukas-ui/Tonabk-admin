@@ -10,6 +10,7 @@ import AdminParrainages from "./admin/AdminParrainages";
 import AdminPersonnel from "./admin/AdminPersonnel";
 import AdminPresence from "./admin/AdminPresence";
 import AdminLogin from "./admin/AdminLogin";
+import DefinirMotDePasse from "./admin/DefinirMotDePasse";
 import RequireAdmin from "./admin/RequireAdmin";
 import { SeulementAdmin } from "./admin/RoleContext";
 
@@ -18,6 +19,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/connexion" element={<AdminLogin />} />
+        <Route path="/definir-mot-de-passe/:token" element={<DefinirMotDePasse />} />
         <Route
           path="/"
           element={
