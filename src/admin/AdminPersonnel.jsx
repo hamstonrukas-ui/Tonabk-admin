@@ -93,13 +93,26 @@ export default function AdminPersonnel() {
       {dernierCree && (
         <div style={{ background: "#FFF8F2", border: "1px solid #F5720C66", borderRadius: 10, padding: 16, maxWidth: 420, marginBottom: 24 }}>
           <p style={{ fontWeight: 700, margin: "0 0 8px" }}>Compte créé pour {dernierCree.nom}</p>
-          <p style={{ fontSize: 13, margin: "0 0 4px" }}>
-            Email de connexion : <strong>{dernierCree.email}</strong>
-          </p>
-          <p style={{ fontSize: 12, color: "#666", margin: 0 }}>
-            Communiquez cet email à la personne. Pour le mot de passe, voyez avec vous pour le moment
-            (la définition du mot de passe par WhatsApp arrive bientôt).
-          </p>
+          {dernierCree.lien ? (
+            <>
+              <p style={{ fontSize: 12, color: "#666", margin: "0 0 8px" }}>
+                Envoyez ce lien à {dernierCree.nom} sur WhatsApp — en cliquant dessus, il choisira
+                directement son mot de passe et accédera au tableau de bord.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input readOnly value={dernierCree.lien} style={{ flex: 1, fontSize: 11 }} onFocus={(e) => e.target.select()} />
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(dernierCree.lien)}
+                  style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "0 12px", fontWeight: 600 }}
+                >
+                  Copier
+                </button>
+              </div>
+            </>
+          ) : (
+            <p style={{ fontSize: 12, color: "red", margin: 0 }}>{dernierCree.avertissement}</p>
+          )}
         </div>
       )}
 
@@ -125,3 +138,4 @@ export default function AdminPersonnel() {
     </div>
   );
 }
+
