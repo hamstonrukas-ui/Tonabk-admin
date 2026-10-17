@@ -7,60 +7,123 @@ async function authHeaders() {
   return { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` };
 }
 
-// Récupère la position GPS du téléphone/ordinateur, avec un message clair en cas de refus.
+// Position GPS du téléphone.
 function obtenirPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error("Géolocalisation non disponible sur cet appareil"));
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => reject(new Error("Position refusée — autorisez la géolocalisation pour signer la présence")),
+      () => reject(new Error("Position refusée — autorisez la géolocalisation pour continuer")),
       { enableHighAccuracy: true, timeout: 15000 }
     );
   });
 }
 
+// Adresse générale du point (rue/quartier) — service gratuit OpenStreetMap.
+async function obtenirAdresseGenerale(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=17&addressdetails=1`,
+      { headers: { "Accept-Language": "fr" } }
+    );
+    const data = await res.json();
+    return data?.display_name || null;
+  } catch {
+    return null;
+  }
+}
+
+// Institutions/repères nommés dans un rayon de 250m (pharmacies, écoles, marchés,
+// bureaux, églises...) — preuve de terrain plus parlante qu'une simple adresse.
+// Overpass (OpenStreetMap), gratuit, sans clé.
+async function obtenirReperesProches(lat, lng) {
+  const requete = `
+    [out:json][timeout:12];
+    (
+      node(around:250,${lat},${lng})[name][amenity];
+      node(around:250,${lat},${lng})[name][shop];
+      node(around:250,${lat},${lng})[name][office];
+    );
+    out body 6;
+  `;
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: requete,
+    });
+    const data = await res.json();
+    const noms = (data.elements || [])
+      .map((e) => e.tags?.name)
+      .filter(Boolean);
+    return [...new Set(noms)].slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
+// Combine adresse générale + repères proches en un seul texte à enregistrer.
+async function obtenirAdresse(lat, lng) {
+  const [adresse, reperes] = await Promise.all([
+    obtenirAdresseGenerale(lat, lng),
+    obtenirReperesProches(lat, lng),
+  ]);
+  const partieReperes = reperes.length ? `Près de : ${reperes.join(", ")}` : "";
+  return [partieReperes, adresse].filter(Boolean).join(" — ") || null;
+}
+
+const fmtHeure = (iso) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
 export default function AdminPresence() {
-  const [presence, setPresence] = useState(undefined); // undefined = chargement, null = rien aujourd'hui
+  const [presence, setPresence] = useState(undefined); // undefined = chargement, null = pas encore aujourd'hui
+  const [historique, setHistorique] = useState([]);
   const [enCours, setEnCours] = useState(false);
+  const [etapeEnCours, setEtapeEnCours] = useState(""); // texte affiché pendant la localisation
   const [erreur, setErreur] = useState("");
   const [activites, setActivites] = useState("");
   const [difficultes, setDifficultes] = useState("");
-  const [erreurChargement, setErreurChargement] = useState("");
+  const [afficherCloture, setAfficherCloture] = useState(false);
 
   async function charger() {
-    setErreurChargement("");
+    setErreur("");
     try {
       const headers = await authHeaders();
-      const res = await fetch(`${API_URL}/api/presences/aujourdhui`, { headers });
-      if (res.ok) {
-        setPresence(await res.json());
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setErreurChargement(data.error || `Erreur ${res.status} du serveur`);
-      }
+      const [resAuj, resHisto] = await Promise.all([
+        fetch(`${API_URL}/api/presences/aujourdhui`, { headers }),
+        fetch(`${API_URL}/api/presences/mon-historique`, { headers }),
+      ]);
+      if (resAuj.ok) setPresence(await resAuj.json());
+      else setErreur((await resAuj.json().catch(() => ({}))).error || `Erreur ${resAuj.status}`);
+
+      if (resHisto.ok) setHistorique(await resHisto.json());
     } catch {
-      setErreurChargement("Impossible de contacter le serveur (vérifiez VITE_API_URL et la connexion)");
+      setErreur("Impossible de contacter le serveur");
     }
   }
 
   useEffect(() => { charger(); }, []);
 
-  const signer = async () => {
+  const commencer = async () => {
     setErreur("");
     setEnCours(true);
     try {
+      setEtapeEnCours("Localisation en cours...");
       const { lat, lng } = await obtenirPosition();
+      setEtapeEnCours("Recherche du lieu...");
+      const adresse = await obtenirAdresse(lat, lng);
+
       const headers = await authHeaders();
       const res = await fetch(`${API_URL}/api/presences/signer`, {
-        method: "POST", headers, body: JSON.stringify({ lat, lng }),
+        method: "POST", headers, body: JSON.stringify({ lat, lng, adresse }),
       });
       const data = await res.json();
-      if (!res.ok) { setErreur(data.error); setEnCours(false); return; }
+      if (!res.ok) { setErreur(data.error); setEnCours(false); setEtapeEnCours(""); return; }
       setPresence(data);
     } catch (err) {
       setErreur(err.message);
     }
     setEnCours(false);
+    setEtapeEnCours("");
   };
 
   const cloturer = async (e) => {
@@ -69,27 +132,40 @@ export default function AdminPresence() {
     if (!activites.trim()) { setErreur("Décrivez les activités réalisées"); return; }
 
     setEnCours(true);
+    let lat = null, lng = null, adresse = null;
     try {
-      const { lat, lng } = await obtenirPosition();
+      setEtapeEnCours("Localisation en cours...");
+      const position = await obtenirPosition();
+      lat = position.lat; lng = position.lng;
+      adresse = await obtenirAdresse(lat, lng);
+    } catch {
+      // La position est optionnelle à la clôture : on continue sans si refusée/indisponible.
+    }
+
+    try {
+      setEtapeEnCours("Enregistrement...");
       const headers = await authHeaders();
       const res = await fetch(`${API_URL}/api/presences/cloturer`, {
         method: "PUT", headers,
-        body: JSON.stringify({ lat, lng, activites, difficultes }),
+        body: JSON.stringify({ lat, lng, adresse, activites, difficultes }),
       });
       const data = await res.json();
-      if (!res.ok) { setErreur(data.error); setEnCours(false); return; }
+      if (!res.ok) { setErreur(data.error); setEnCours(false); setEtapeEnCours(""); return; }
       setPresence(data);
-    } catch (err) {
-      setErreur(err.message);
+      setAfficherCloture(false);
+      charger(); // rafraîchit aussi l'historique
+    } catch {
+      setErreur("Impossible de contacter le serveur");
     }
     setEnCours(false);
+    setEtapeEnCours("");
   };
 
-  if (erreurChargement) {
+  if (erreur && presence === undefined) {
     return (
       <div style={{ maxWidth: 420 }}>
-        <h1>Présence du jour</h1>
-        <p style={{ color: "red" }}>{erreurChargement}</p>
+        <h1>Présence</h1>
+        <p style={{ color: "red" }}>{erreur}</p>
         <button onClick={charger} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 20px", fontWeight: 600 }}>
           Réessayer
         </button>
@@ -100,48 +176,98 @@ export default function AdminPresence() {
   if (presence === undefined) return <p>Chargement...</p>;
 
   return (
-    <div style={{ maxWidth: 420 }}>
-      <h1>Présence du jour</h1>
+    <div style={{ maxWidth: 480 }}>
+      <h1 style={{ marginBottom: 4 }}>Présence</h1>
+      <p style={{ color: "#999", fontSize: 13, marginTop: 0, textTransform: "capitalize" }}>{fmtDate(new Date().toISOString())}</p>
+
       {erreur && <p style={{ color: "red", fontSize: 13 }}>{erreur}</p>}
 
+      {/* Aucune présence aujourd'hui : gros bouton pour démarrer */}
       {!presence && (
-        <div style={{ background: "#fff", borderRadius: 10, padding: 20, textAlign: "center" }}>
-          <p style={{ color: "#666", marginBottom: 16 }}>Vous n'avez pas encore signé votre présence aujourd'hui.</p>
-          <button onClick={signer} disabled={enCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "12px 24px", fontWeight: 600 }}>
-            {enCours ? "Localisation..." : "Signer la présence"}
+        <div style={{ background: "#fff", borderRadius: 10, padding: 24, textAlign: "center" }}>
+          <p style={{ color: "#666", marginBottom: 16 }}>Vous n'avez pas encore commencé votre journée.</p>
+          <button onClick={commencer} disabled={enCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 8, padding: "14px 28px", fontWeight: 700, fontSize: 15 }}>
+            {enCours ? etapeEnCours : "Commencer le travail"}
           </button>
         </div>
       )}
 
+      {/* Journée en cours */}
       {presence && !presence.heure_fin && (
         <>
           <div style={{ background: "#fff", borderRadius: 10, padding: 16, marginBottom: 16 }}>
-            <p style={{ margin: 0, color: "#2E7D32", fontWeight: 600 }}>✓ Présence signée à {new Date(presence.heure_debut).toLocaleTimeString("fr-FR")}</p>
+            <p style={{ margin: "0 0 4px", color: "#2E7D32", fontWeight: 700 }}>✓ Journée commencée</p>
+            <p style={{ margin: 0, fontSize: 13, color: "#666" }}>à {fmtHeure(presence.heure_debut)}</p>
+            {presence.adresse_debut && (
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#999" }}>📍 {presence.adresse_debut}</p>
+            )}
           </div>
 
-          <form onSubmit={cloturer} style={{ background: "#fff", borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-            <h3 style={{ margin: 0 }}>Clôturer la journée</h3>
-            <label style={{ fontSize: 13, color: "#666" }}>
-              Activités réalisées
-              <textarea value={activites} onChange={(e) => setActivites(e.target.value)} rows={3} required style={{ width: "100%", marginTop: 4 }} />
-            </label>
-            <label style={{ fontSize: 13, color: "#666" }}>
-              Difficultés rencontrées (optionnel)
-              <textarea value={difficultes} onChange={(e) => setDifficultes(e.target.value)} rows={3} style={{ width: "100%", marginTop: 4 }} />
-            </label>
-            <button type="submit" disabled={enCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "12px 0", fontWeight: 600 }}>
-              {enCours ? "Localisation..." : "Clôturer la journée"}
+          {!afficherCloture ? (
+            <button
+              onClick={() => setAfficherCloture(true)}
+              style={{ width: "100%", background: "#fff", border: "2px solid #F5720C", color: "#F5720C", borderRadius: 8, padding: "14px 0", fontWeight: 700 }}
+            >
+              Clôturer la journée
             </button>
-          </form>
+          ) : (
+            <form onSubmit={cloturer} style={{ background: "#fff", borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              <h3 style={{ margin: 0 }}>Clôturer la journée</h3>
+              <label style={{ fontSize: 13, color: "#666" }}>
+                Activités réalisées
+                <textarea value={activites} onChange={(e) => setActivites(e.target.value)} rows={3} required style={{ width: "100%", marginTop: 4 }} />
+              </label>
+              <label style={{ fontSize: 13, color: "#666" }}>
+                Difficultés rencontrées (optionnel)
+                <textarea value={difficultes} onChange={(e) => setDifficultes(e.target.value)} rows={3} style={{ width: "100%", marginTop: 4 }} />
+              </label>
+              <p style={{ fontSize: 11, color: "#999", margin: 0 }}>
+                La position sera reprise si vous l'autorisez (facultatif à cette étape).
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => setAfficherCloture(false)} style={{ flex: 1, background: "#eee", border: "none", borderRadius: 6, padding: "12px 0" }}>
+                  Annuler
+                </button>
+                <button type="submit" disabled={enCours} style={{ flex: 2, background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "12px 0", fontWeight: 700 }}>
+                  {enCours ? etapeEnCours : "Envoyer et clôturer"}
+                </button>
+              </div>
+            </form>
+          )}
         </>
       )}
 
+      {/* Journée déjà clôturée : récap, et on repartira à zéro demain */}
       {presence && presence.heure_fin && (
         <div style={{ background: "#fff", borderRadius: 10, padding: 16 }}>
-          <p style={{ color: "#2E7D32", fontWeight: 600, marginTop: 0 }}>✓ Journée clôturée à {new Date(presence.heure_fin).toLocaleTimeString("fr-FR")}</p>
+          <p style={{ color: "#2E7D32", fontWeight: 700, marginTop: 0 }}>✓ Journée clôturée</p>
+          <p style={{ fontSize: 13, color: "#666", margin: "0 0 10px" }}>
+            {fmtHeure(presence.heure_debut)} → {fmtHeure(presence.heure_fin)}
+          </p>
           <p style={{ fontSize: 13 }}><strong>Activités :</strong> {presence.activites}</p>
           {presence.difficultes && <p style={{ fontSize: 13 }}><strong>Difficultés :</strong> {presence.difficultes}</p>}
-          <p style={{ fontSize: 12, color: "#999" }}>À demain !</p>
+          {presence.adresse_fin && <p style={{ fontSize: 12, color: "#999" }}>📍 Fin : {presence.adresse_fin}</p>}
+          <p style={{ fontSize: 12, color: "#999", marginBottom: 0 }}>Le bouton "Commencer le travail" reviendra demain.</p>
+        </div>
+      )}
+
+      {/* Historique des jours précédents */}
+      {historique.length > 1 && (
+        <div style={{ marginTop: 28 }}>
+          <h3>Historique</h3>
+          <div style={{ background: "#fff", borderRadius: 10, overflow: "hidden" }}>
+            {historique
+              .filter((p) => p.date !== presence?.date)
+              .map((p) => (
+                <div key={p.id} style={{ padding: 12, borderBottom: "1px solid #eee" }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 13, textTransform: "capitalize" }}>{fmtDate(p.date)}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#666" }}>
+                    {fmtHeure(p.heure_debut)} → {p.heure_fin ? fmtHeure(p.heure_fin) : "non clôturée"}
+                  </p>
+                  {p.activites && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#999" }}>{p.activites}</p>}
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>
