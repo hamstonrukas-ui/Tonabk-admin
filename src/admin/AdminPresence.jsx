@@ -83,6 +83,7 @@ export default function AdminPresence() {
   const [activites, setActivites] = useState("");
   const [difficultes, setDifficultes] = useState("");
   const [afficherCloture, setAfficherCloture] = useState(false);
+  const [positionAConfirmer, setPositionAConfirmer] = useState(null); // { lat, lng, adresse }
 
   async function charger() {
     setErreur("");
@@ -103,7 +104,8 @@ export default function AdminPresence() {
 
   useEffect(() => { charger(); }, []);
 
-  const commencer = async () => {
+  // Étape 1 : localiser et montrer la carte, sans encore rien enregistrer.
+  const localiser = async () => {
     setErreur("");
     setEnCours(true);
     try {
@@ -111,19 +113,32 @@ export default function AdminPresence() {
       const { lat, lng } = await obtenirPosition();
       setEtapeEnCours("Recherche du lieu...");
       const adresse = await obtenirAdresse(lat, lng);
-
-      const headers = await authHeaders();
-      const res = await fetch(`${API_URL}/api/presences/signer`, {
-        method: "POST", headers, body: JSON.stringify({ lat, lng, adresse }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setErreur(data.error); setEnCours(false); setEtapeEnCours(""); return; }
-      setPresence(data);
+      setPositionAConfirmer({ lat, lng, adresse });
     } catch (err) {
       setErreur(err.message);
     }
     setEnCours(false);
     setEtapeEnCours("");
+  };
+
+  // Étape 2 : la personne a vu la carte et confirme.
+  const signer = async () => {
+    if (!positionAConfirmer) return;
+    setErreur("");
+    setEnCours(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_URL}/api/presences/signer`, {
+        method: "POST", headers, body: JSON.stringify(positionAConfirmer),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErreur(data.error); setEnCours(false); return; }
+      setPresence(data);
+      setPositionAConfirmer(null);
+    } catch {
+      setErreur("Impossible de contacter le serveur");
+    }
+    setEnCours(false);
   };
 
   const cloturer = async (e) => {
@@ -182,13 +197,39 @@ export default function AdminPresence() {
 
       {erreur && <p style={{ color: "red", fontSize: 13 }}>{erreur}</p>}
 
-      {/* Aucune présence aujourd'hui : gros bouton pour démarrer */}
-      {!presence && (
+      {/* Aucune présence aujourd'hui, et pas encore de position repérée */}
+      {!presence && !positionAConfirmer && (
         <div style={{ background: "#fff", borderRadius: 10, padding: 24, textAlign: "center" }}>
           <p style={{ color: "#666", marginBottom: 16 }}>Vous n'avez pas encore commencé votre journée.</p>
-          <button onClick={commencer} disabled={enCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 8, padding: "14px 28px", fontWeight: 700, fontSize: 15 }}>
+          <button onClick={localiser} disabled={enCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 8, padding: "14px 28px", fontWeight: 700, fontSize: 15 }}>
             {enCours ? etapeEnCours : "Commencer le travail"}
           </button>
+        </div>
+      )}
+
+      {/* Position repérée : on montre la carte avant de signer pour de vrai */}
+      {!presence && positionAConfirmer && (
+        <div style={{ background: "#fff", borderRadius: 10, overflow: "hidden" }}>
+          <iframe
+            title="Votre position"
+            width="100%"
+            height="220"
+            style={{ border: 0, display: "block" }}
+            src={`https://www.openstreetmap.org/export/embed.html?bbox=${positionAConfirmer.lng - 0.004}%2C${positionAConfirmer.lat - 0.004}%2C${positionAConfirmer.lng + 0.004}%2C${positionAConfirmer.lat + 0.004}&marker=${positionAConfirmer.lat}%2C${positionAConfirmer.lng}`}
+          />
+          <div style={{ padding: 16 }}>
+            <p style={{ fontSize: 13, color: "#666", margin: "0 0 12px" }}>
+              {positionAConfirmer.adresse || "Position repérée (adresse non trouvée)"}
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setPositionAConfirmer(null)} disabled={enCours} style={{ flex: 1, background: "#eee", border: "none", borderRadius: 6, padding: "12px 0" }}>
+                Annuler
+              </button>
+              <button onClick={signer} disabled={enCours} style={{ flex: 2, background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "12px 0", fontWeight: 700 }}>
+                {enCours ? "Signature..." : "Signer la présence"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
