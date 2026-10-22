@@ -199,9 +199,9 @@ export default function AdminSoldes() {
           ))}
         </div>
         {photos.length < MAX_PHOTOS && (
-          <label style={{ fontSize: 12, color: "#666" }}>
-            {photos.length === 0 ? "Une ou plusieurs photos" : "Ajouter d'autres photos"}
-            <input type="file" accept="image/*" multiple
+          <label style={{ fontSize: 13, color: "#F5720C", fontWeight: 600, border: "2px dashed #F5720C66", borderRadius: 8, padding: "12px 0", textAlign: "center", cursor: "pointer" }}>
+            {photos.length === 0 ? "Choisir une ou plusieurs photos" : "Ajouter d'autres photos"}
+            <input type="file" accept="image/*" multiple style={{ display: "none" }}
               onChange={(e) => {
                 setPhotos((prev) => [...prev, ...Array.from(e.target.files || []).slice(0, MAX_PHOTOS - prev.length)]);
                 e.target.value = "";
@@ -281,9 +281,9 @@ export default function AdminSoldes() {
                   ))}
                 </div>
                 {editPhotosExistantes.length + editPhotos.length < MAX_PHOTOS && (
-                  <label style={{ fontSize: 12, color: "#666" }}>
+                  <label style={{ fontSize: 13, color: "#F5720C", fontWeight: 600, border: "2px dashed #F5720C66", borderRadius: 8, padding: "12px 0", textAlign: "center", cursor: "pointer" }}>
                     Ajouter des photos
-                    <input type="file" accept="image/*" multiple
+                    <input type="file" accept="image/*" multiple style={{ display: "none" }}
                       onChange={(e) => {
                         const max = MAX_PHOTOS - editPhotosExistantes.length - editPhotos.length;
                         setEditPhotos((prev) => [...prev, ...Array.from(e.target.files || []).slice(0, max)]);
