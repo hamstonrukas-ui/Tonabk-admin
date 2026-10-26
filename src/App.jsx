@@ -10,6 +10,7 @@ import AdminParrainages from "./admin/AdminParrainages";
 import AdminPersonnel from "./admin/AdminPersonnel";
 import AdminSoldes from "./admin/AdminSoldes";
 import AdminPresence from "./admin/AdminPresence";
+import AdminRecuperationBoutique from "./admin/AdminRecuperationBoutique";
 import AdminLogin from "./admin/AdminLogin";
 import DefinirMotDePasse from "./admin/DefinirMotDePasse";
 import RequireAdmin from "./admin/RequireAdmin";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="personnel" element={<SeulementAdmin><AdminPersonnel /></SeulementAdmin>} />
           <Route path="soldes" element={<SeulementAdmin><AdminSoldes /></SeulementAdmin>} />
           <Route path="presence" element={<AdminPresence />} />
+          <Route path="recuperation" element={<SeulementAdmin><AdminRecuperationBoutique /></SeulementAdmin>} />
         </Route>
       </Routes>
     </BrowserRouter>
