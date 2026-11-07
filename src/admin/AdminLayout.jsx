@@ -20,6 +20,7 @@ export default function AdminLayout() {
           {complet && <NavLink to="/" end>Vue d'ensemble</NavLink>}
           {complet && <NavLink to="/boutiques">Boutiques à valider</NavLink>}
           <NavLink to="/toutes-boutiques">{complet ? "Toutes les boutiques" : "Boutiques"}</NavLink>
+          {complet && <NavLink to="/classement">Classer les articles</NavLink>}
           {complet && <NavLink to="/requetes">Requêtes</NavLink>}
           {complet && <NavLink to="/maisons">Maisons</NavLink>}
           {complet && <NavLink to="/parrainages">Parrainages</NavLink>}
