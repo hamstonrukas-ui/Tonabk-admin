@@ -8,9 +8,11 @@ import AdminRequetes from "./admin/AdminRequetes";
 import AdminMaisons from "./admin/AdminMaisons";
 import AdminParrainages from "./admin/AdminParrainages";
 import AdminPersonnel from "./admin/AdminPersonnel";
+import AdminSuiviPersonnel from "./admin/AdminSuiviPersonnel";
 import AdminSoldes from "./admin/AdminSoldes";
 import AdminPresence from "./admin/AdminPresence";
 import AdminRecuperationBoutique from "./admin/AdminRecuperationBoutique";
+import AdminLivraisons from "./admin/AdminLivraisons";
 import AdminLogin from "./admin/AdminLogin";
 import DefinirMotDePasse from "./admin/DefinirMotDePasse";
 import RequireAdmin from "./admin/RequireAdmin";
@@ -38,8 +40,10 @@ export default function App() {
           <Route path="maisons" element={<SeulementAdmin><AdminMaisons /></SeulementAdmin>} />
           <Route path="parrainages" element={<SeulementAdmin><AdminParrainages /></SeulementAdmin>} />
           <Route path="personnel" element={<SeulementAdmin><AdminPersonnel /></SeulementAdmin>} />
+          <Route path="personnel/:id" element={<SeulementAdmin><AdminSuiviPersonnel /></SeulementAdmin>} />
           <Route path="soldes" element={<SeulementAdmin><AdminSoldes /></SeulementAdmin>} />
           <Route path="presence" element={<AdminPresence />} />
+          <Route path="livraisons" element={<AdminLivraisons />} />
           <Route path="recuperation" element={<SeulementAdmin><AdminRecuperationBoutique /></SeulementAdmin>} />
         </Route>
       </Routes>
