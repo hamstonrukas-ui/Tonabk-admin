@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
 
@@ -15,12 +16,17 @@ export default function AdminPersonnel() {
   const [erreur, setErreur] = useState("");
   const [dernierCree, setDernierCree] = useState(null);
   const [erreurListe, setErreurListe] = useState("");
+  const [resume, setResume] = useState({});
 
   async function charger() {
     setErreurListe("");
     try {
       const headers = await authHeaders();
       const res = await fetch(`${API_URL}/api/personnel`, { headers });
+      fetch(`${API_URL}/api/suivi-personnel/resume`, { headers })
+        .then((r) => (r.ok ? r.json() : {}))
+        .then(setResume)
+        .catch(() => {});
       if (res.ok) {
         setPersonnel(await res.json());
       } else {
@@ -130,6 +136,17 @@ export default function AdminPersonnel() {
             <div>
               <strong>{p.nom}</strong>
               <div style={{ fontSize: 12, color: "#7A7A7A" }}>{p.telephone} — {p.email}</div>
+              {resume[p.id] && (
+                <div style={{ fontSize: 12, marginTop: 4 }}>
+                  📅 <strong>{resume[p.id].jours_mois}</strong> jour{resume[p.id].jours_mois > 1 ? "s" : ""} ce mois
+                  {resume[p.id].non_cloturees > 0 && (
+                    <span style={{ color: "#D32F2F" }}> · {resume[p.id].non_cloturees} non clôturé{resume[p.id].non_cloturees > 1 ? "s" : ""}</span>
+                  )}
+                </div>
+              )}
+              <Link to={`/personnel/${p.id}`} style={{ fontSize: 12, color: "#F5720C", fontWeight: 700 }}>
+                Voir les jours de travail →
+              </Link>
             </div>
             <button style={{ color: "red" }} onClick={() => retirerPersonnel(p.id)}>Retirer</button>
           </div>
@@ -138,4 +155,3 @@ export default function AdminPersonnel() {
     </div>
   );
 }
-
