@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { API_URL } from "../lib/api";
 
 export default function DefinirMotDePasse() {
   const { token } = useParams();
-  const navigate = useNavigate();
   const [nom, setNom] = useState("");
   const [verification, setVerification] = useState("en-cours"); // en-cours | ok | invalide
+  const [telephone, setTelephone] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
-  const [termine, setTermine] = useState(false);
+  const [emailConnexion, setEmailConnexion] = useState(null);
 
   useEffect(() => {
     fetch(`${API_URL}/api/personnel/invitation/${token}`)
@@ -35,12 +35,11 @@ export default function DefinirMotDePasse() {
       const res = await fetch(`${API_URL}/api/personnel/invitation/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ motDePasse }),
+        body: JSON.stringify({ telephone, motDePasse }),
       });
       const data = await res.json();
       if (!res.ok) { setErreur(data.error || "Échec de l'enregistrement"); setEnvoiEnCours(false); return; }
-      setTermine(true);
-      setTimeout(() => navigate("/connexion"), 2500);
+      setEmailConnexion(data.email);
     } catch {
       setErreur("Impossible de contacter le serveur");
     }
@@ -48,7 +47,7 @@ export default function DefinirMotDePasse() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F3F3F3" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F3F3F3", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 24, width: "100%", maxWidth: 360 }}>
         <h2 style={{ color: "#F5720C", marginTop: 0 }}>TonaBk Admin</h2>
 
@@ -57,16 +56,20 @@ export default function DefinirMotDePasse() {
         {verification === "invalide" && (
           <>
             <p style={{ color: "red", fontSize: 13 }}>{erreur}</p>
-            <p style={{ fontSize: 13, color: "#666" }}>Demandez un nouveau lien à l'administrateur.</p>
+            <p style={{ fontSize: 13, color: "#666" }}>Demandez votre lien à l'administrateur.</p>
           </>
         )}
 
-        {verification === "ok" && !termine && (
+        {verification === "ok" && !emailConnexion && (
           <form onSubmit={valider} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ fontSize: 13, color: "#666" }}>
-              Bienvenue {nom} — choisissez votre mot de passe pour accéder au tableau de bord.
+            <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
+              Bienvenue {nom}. Pour confirmer que c'est bien votre compte, entrez d'abord votre numéro WhatsApp, puis choisissez votre mot de passe.
             </p>
-            {erreur && <p style={{ color: "red", fontSize: 13 }}>{erreur}</p>}
+            {erreur && <p style={{ color: "red", fontSize: 13, margin: 0 }}>{erreur}</p>}
+            <input
+              type="tel" placeholder="Votre numéro WhatsApp" value={telephone}
+              onChange={(e) => setTelephone(e.target.value)} required
+            />
             <input
               type="password" placeholder="Nouveau mot de passe" value={motDePasse}
               onChange={(e) => setMotDePasse(e.target.value)} required minLength={6}
@@ -81,12 +84,17 @@ export default function DefinirMotDePasse() {
           </form>
         )}
 
-        {termine && (
+        {emailConnexion && (
           <>
-            <p style={{ color: "#2E7D32", fontWeight: 600 }}>Mot de passe défini !</p>
-            <p style={{ fontSize: 13, color: "#666" }}>
-              Redirection vers la connexion... <Link to="/connexion">cliquez ici</Link> si rien ne se passe.
+            <p style={{ color: "#2E7D32", fontWeight: 700, marginTop: 0 }}>Mot de passe défini !</p>
+            <p style={{ fontSize: 13, color: "#666" }}>Pour vous connecter, utilisez cet identifiant :</p>
+            <p style={{ background: "#F3F3F3", borderRadius: 6, padding: 10, fontWeight: 700, fontSize: 13, wordBreak: "break-all" }}>
+              {emailConnexion}
             </p>
+            <Link to="/connexion" style={{ display: "block", textAlign: "center", background: "#F5720C", color: "#fff", borderRadius: 6, padding: "12px 0", fontWeight: 600, textDecoration: "none" }}>
+              Aller à la connexion
+            </Link>
+            <p style={{ fontSize: 11, color: "#999" }}>Ce lien reste valable : vous pourrez l'utiliser à nouveau si vous oubliez votre mot de passe.</p>
           </>
         )}
       </div>
