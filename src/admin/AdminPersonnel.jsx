@@ -17,6 +17,7 @@ export default function AdminPersonnel() {
   const [dernierCree, setDernierCree] = useState(null);
   const [erreurListe, setErreurListe] = useState("");
   const [resume, setResume] = useState({});
+  const [lienCopie, setLienCopie] = useState(null);
 
   async function charger() {
     setErreurListe("");
@@ -102,8 +103,8 @@ export default function AdminPersonnel() {
           {dernierCree.lien ? (
             <>
               <p style={{ fontSize: 12, color: "#666", margin: "0 0 8px" }}>
-                Envoyez ce lien à {dernierCree.nom} sur WhatsApp — en cliquant dessus, il choisira
-                directement son mot de passe et accédera au tableau de bord.
+                Envoyez ce lien à {dernierCree.nom} sur WhatsApp — en cliquant dessus, il entrera son numéro puis
+                choisira son mot de passe. Ce lien est permanent et reste disponible dans la liste ci-dessous.
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 <input readOnly value={dernierCree.lien} style={{ flex: 1, fontSize: 11 }} onFocus={(e) => e.target.select()} />
@@ -147,6 +148,17 @@ export default function AdminPersonnel() {
               <Link to={`/personnel/${p.id}`} style={{ fontSize: 12, color: "#F5720C", fontWeight: 700 }}>
                 Voir les jours de travail →
               </Link>
+              {p.lien && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(p.lien); setLienCopie(p.id); setTimeout(() => setLienCopie(null), 2000); }}
+                    style={{ fontSize: 12, color: "#1B1B1B", background: "none", border: "none", padding: 0, marginTop: 4, cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    {lienCopie === p.id ? "✓ Lien copié" : "Copier son lien (permanent)"}
+                  </button>
+                </div>
+              )}
             </div>
             <button style={{ color: "red" }} onClick={() => retirerPersonnel(p.id)}>Retirer</button>
           </div>
