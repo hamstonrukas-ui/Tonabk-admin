@@ -27,6 +27,7 @@ export default function AdminLayout() {
           {complet && <NavLink to="/personnel">Personnel</NavLink>}
           {complet && <NavLink to="/soldes">Soldes</NavLink>}
           {complet && <NavLink to="/recuperation">Récupération</NavLink>}
+          <NavLink to="/livraisons">{complet ? "Livraisons" : "Mes livraisons"}</NavLink>
           <NavLink to="/presence">Présence</NavLink>
         </nav>
         <button
