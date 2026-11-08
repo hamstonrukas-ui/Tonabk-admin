@@ -17,6 +17,9 @@ export default function AdminLivraisons() {
   const [personnel, setPersonnel] = useState([]);
   const [erreur, setErreur] = useState("");
   const [partage, setPartage] = useState(false);
+  const [choix, setChoix] = useState({}); // livreur choisi (pas encore validé) pour chaque commande
+  const [enCours, setEnCours] = useState(null); // commande en cours d'assignation
+  const [message, setMessage] = useState("");
   const watchId = useRef(null);
   const dernierEnvoi = useRef(0);
   const livraisonsRef = useRef([]);
@@ -46,11 +49,25 @@ export default function AdminLivraisons() {
     return () => { clearInterval(t); arreterPartage(); };
   }, []);
 
-  const assigner = async (id, livreur_id) => {
+  const assigner = async (id) => {
+    const livreur_id = choix[id];
     if (!livreur_id) return;
-    const headers = await authHeaders();
-    await fetch(`${API_URL}/api/livraisons/${id}/assigner`, { method: "PUT", headers, body: JSON.stringify({ livreur_id }) });
-    charger();
+    setEnCours(id);
+    setMessage("");
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_URL}/api/livraisons/${id}/assigner`, {
+        method: "PUT", headers, body: JSON.stringify({ livreur_id }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Erreur ${res.status}`);
+      setChoix((c) => { const n = { ...c }; delete n[id]; return n; });
+      await charger();
+      setMessage("Livreur assigné.");
+    } catch (e) {
+      setErreur(e.message);
+    } finally {
+      setEnCours(null);
+    }
   };
 
   const changerStatut = async (id, statut) => {
@@ -97,6 +114,7 @@ export default function AdminLivraisons() {
     <div style={{ maxWidth: 560 }}>
       <h1>{complet ? "Livraisons" : "Mes livraisons"}</h1>
       {erreur && <p style={{ color: "red", fontSize: 13 }}>{erreur}</p>}
+      {message && <p style={{ color: "#2E7D32", fontSize: 13 }}>{message}</p>}
       {!complet && partage && (
         <p style={{ background: "#E8F5E9", color: "#2E7D32", fontSize: 12, padding: 10, borderRadius: 8 }}>
           📍 Votre position est partagée en direct avec le client. Gardez cette page ouverte et l'écran allumé.
@@ -118,14 +136,34 @@ export default function AdminLivraisons() {
           <p style={{ margin: "4px 0", fontSize: 12, color: "#666" }}>📍 {l.client_adresse}</p>
 
           {complet && (l.statut === "en_attente" || l.statut === "acceptee") && (
-            <select
-              defaultValue={l.livreur_id || ""}
-              onChange={(e) => assigner(l.id, e.target.value)}
-              style={{ marginTop: 8, width: "100%" }}
-            >
-              <option value="">— Assigner un livreur —</option>
-              {personnel.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-            </select>
+            <div style={{ marginTop: 10, borderTop: "1px solid #eee", paddingTop: 10 }}>
+              <p style={{ fontSize: 12, color: "#666", margin: "0 0 6px" }}>
+                {l.livreur_id
+                  ? <>Livreur : <strong>{personnel.find((p) => p.id === l.livreur_id)?.nom || "—"}</strong></>
+                  : "Aucun livreur assigné"}
+              </p>
+              {personnel.length === 0 ? (
+                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>Aucun livreur : créez d'abord un compte dans « Personnel ».</p>
+              ) : (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <select
+                    value={choix[l.id] ?? l.livreur_id ?? ""}
+                    onChange={(e) => setChoix((c) => ({ ...c, [l.id]: e.target.value }))}
+                    style={{ flex: 1, minWidth: 0, padding: 8 }}
+                  >
+                    <option value="">— Choisir un livreur —</option>
+                    {personnel.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                  </select>
+                  <button
+                    onClick={() => assigner(l.id)}
+                    disabled={enCours === l.id || !choix[l.id] || choix[l.id] === l.livreur_id}
+                    style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "0 14px", fontWeight: 700, opacity: (!choix[l.id] || choix[l.id] === l.livreur_id) ? 0.4 : 1 }}
+                  >
+                    {enCours === l.id ? "..." : l.livreur_id ? "Changer" : "Assigner"}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {!complet && l.statut === "acceptee" && (
