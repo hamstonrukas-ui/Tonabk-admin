@@ -61,6 +61,9 @@ export default function AdminGererProduits() {
   const [lotEnCours, setLotEnCours] = useState(false);
   const [lotProgression, setLotProgression] = useState(0);
   const [lotTotal, setLotTotal] = useState(0);
+  const [sousCategories, setSousCategories] = useState([]); // rangement : sous-catégories de la catégorie de la boutique
+  const [lotRacineId, setLotRacineId] = useState("");
+  const [lotTypeId, setLotTypeId] = useState("");
 
   const choisirPhotosLot = (e) => {
     const fichiers = Array.from(e.target.files || []).slice(0, MAX_PAR_LOT - lignesLot.length);
@@ -127,6 +130,7 @@ export default function AdminGererProduits() {
             photo_thumb_url: url,
             prix_gros: null,
             quantite_min_gros: null,
+            sous_categorie_id: complet ? lotTypeId || lotRacineId || null : null,
           }),
         });
         if (!res.ok) {
@@ -142,7 +146,11 @@ export default function AdminGererProduits() {
     setLotEnCours(false);
     setLignesLot(restantes);
     charger();
-    if (restantes.length === 0) setAfficherLot(false);
+    if (restantes.length === 0) {
+      setAfficherLot(false);
+      setLotRacineId("");
+      setLotTypeId("");
+    }
   };
 
   async function charger() {
@@ -163,6 +171,23 @@ export default function AdminGererProduits() {
   }
 
   useEffect(() => { charger(); }, [id]);
+
+  // Sous-catégories proposées pour ranger le lot (admin complet uniquement)
+  useEffect(() => {
+    if (!complet || !boutique?.categorie_id) { setSousCategories([]); return; }
+    (async () => {
+      try {
+        const res = await fetchAvecDelai(`${API_URL}/api/sous-categories?categorie_id=${encodeURIComponent(boutique.categorie_id)}`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data)) setSousCategories(data);
+      } catch {
+        /* sans sous-catégories, l'ajout en lot reste possible */
+      }
+    })();
+  }, [complet, boutique?.categorie_id]);
+
+  const racinesLot = sousCategories.filter((s) => !s.parent_id);
+  const typesLot = sousCategories.filter((s) => lotRacineId && s.parent_id === lotRacineId);
 
   const ajouterProduit = async (e) => {
     e.preventDefault();
@@ -358,6 +383,26 @@ export default function AdminGererProduits() {
                 <option value="USD">Tous les prix en USD ($)</option>
                 <option value="CDF">Tous les prix en CDF (FC)</option>
               </select>
+
+              {complet && racinesLot.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <p style={{ fontSize: 12, color: "#666", margin: 0 }}>Ranger tous les produits de ce lot dans :</p>
+                  <select
+                    value={lotRacineId}
+                    onChange={(e) => { setLotRacineId(e.target.value); setLotTypeId(""); }}
+                    disabled={lotEnCours}
+                  >
+                    <option value="">Sous-catégorie (optionnel)</option>
+                    {racinesLot.map((r) => <option key={r.id} value={r.id}>{r.nom}</option>)}
+                  </select>
+                  {lotRacineId && typesLot.length > 0 && (
+                    <select value={lotTypeId} onChange={(e) => setLotTypeId(e.target.value)} disabled={lotEnCours}>
+                      <option value="">Type d'article (optionnel)</option>
+                      {typesLot.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
 
               {lignesLot.map((l) => (
                 <div key={l.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
