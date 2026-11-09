@@ -41,6 +41,18 @@ export default function AdminClassement() {
   const [message, setMessage] = useState("");
   const [erreur, setErreur] = useState("");
 
+  // Recherche par nom d'article (envoyée au serveur après une courte pause de frappe)
+  const [recherche, setRecherche] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQ(recherche.trim()), 400);
+    return () => clearTimeout(t);
+  }, [recherche]);
+
+  // Modification des prix : valeurs en cours de saisie et état de chaque enregistrement
+  const [edits, setEdits] = useState({}); // id -> { prix, devise }
+  const [sauvegarde, setSauvegarde] = useState({}); // id -> "en_cours" | "ok" | message d'erreur
+
   // --- Catégories (au démarrage) ---
   useEffect(() => {
     (async () => {
@@ -92,7 +104,7 @@ export default function AdminClassement() {
       setErreur("");
       try {
         const res = await fetchAvecDelai(
-          `${API_URL}/api/admin-classement/produits?categorie_id=${encodeURIComponent(categorieId)}&statut=${mode}&page=${p}&limit=${PAR_PAGE}`,
+          `${API_URL}/api/admin-classement/produits?categorie_id=${encodeURIComponent(categorieId)}&statut=${mode === "prix" ? "ranges" : mode}&page=${p}&limit=${PAR_PAGE}&q=${encodeURIComponent(q)}`,
           { headers: await enTetes() }
         );
         const data = await res.json().catch(() => ({}));
@@ -106,7 +118,7 @@ export default function AdminClassement() {
         setChargement(false);
       }
     },
-    [categorieId, mode]
+    [categorieId, mode, q]
   );
 
   // Changement de catégorie ou de mode : on repart de zéro
@@ -156,6 +168,28 @@ export default function AdminClassement() {
     }
   };
 
+  const enregistrerPrix = async (p) => {
+    const e = edits[p.id] || {};
+    const prix = Number(e.prix ?? p.prix);
+    const devise = e.devise ?? p.devise ?? "USD";
+    setSauvegarde((x) => ({ ...x, [p.id]: "en_cours" }));
+    try {
+      const res = await fetchAvecDelai(`${API_URL}/api/admin-classement/produits/${p.id}/prix`, {
+        method: "PUT",
+        headers: await enTetes(),
+        body: JSON.stringify({ prix, devise }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Échec de l'enregistrement");
+      setProduits((prev) => prev.map((x) => (x.id === p.id ? { ...x, prix: data.prix, devise: data.devise } : x)));
+      setEdits((prev) => { const n = { ...prev }; delete n[p.id]; return n; });
+      setSauvegarde((x) => ({ ...x, [p.id]: "ok" }));
+      setTimeout(() => setSauvegarde((x) => { const n = { ...x }; delete n[p.id]; return n; }), 2500);
+    } catch (err) {
+      setSauvegarde((x) => ({ ...x, [p.id]: err.name === "AbortError" ? "Le serveur met trop de temps à répondre." : err.message }));
+    }
+  };
+
   const chip = (actif) =>
     `whitespace-nowrap text-sm font-semibold px-3.5 py-1.5 rounded-full border ${
       actif ? "bg-brand text-white border-brand" : "bg-white text-[#1B1B1B] border-gray-200"
@@ -179,10 +213,19 @@ export default function AdminClassement() {
       <div className="flex items-center gap-2">
         <button onClick={() => setMode("a_ranger")} className={chip(mode === "a_ranger")}>À ranger</button>
         <button onClick={() => setMode("ranges")} className={chip(mode === "ranges")}>Déjà rangés</button>
+        <button onClick={() => setMode("prix")} className={chip(mode === "prix")}>Modifier les prix</button>
         <span className="text-sm text-gray-500 ml-auto">{total} article(s)</span>
       </div>
 
-      {/* Destination */}
+      <input
+        type="search"
+        value={recherche}
+        onChange={(e) => setRecherche(e.target.value)}
+        placeholder="Rechercher un article par son nom…"
+        className="w-full sm:w-80 border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+      />
+
+      {mode !== "prix" && (
       <div className="bg-white rounded-xl p-4 space-y-2">
         <p className="text-sm text-gray-500">Ranger les articles cochés dans :</p>
         {racines.length === 0 ? (
@@ -206,10 +249,13 @@ export default function AdminClassement() {
           </div>
         )}
       </div>
+      )}
 
       {message && <p className="text-sm text-green-600">{message}</p>}
       {erreur && <p className="text-sm text-red-500">{erreur}</p>}
 
+      {mode !== "prix" && (
+        <>
       {/* Barre d'action */}
       <div className="sticky top-0 z-10 bg-[#F3F3F3] py-2 flex flex-wrap items-center gap-3">
         <button onClick={toutSelectionner} className="text-sm font-semibold text-brand">
@@ -257,6 +303,7 @@ export default function AdminClassement() {
               <div className="p-2">
                 <p className="text-xs font-semibold text-[#1B1B1B] truncate">{p.nom}</p>
                 <p className="text-[11px] text-gray-400 truncate">{p.boutiques?.nom}</p>
+                <p className="text-xs font-bold text-[#1B1B1B]">{p.prix} {p.devise}</p>
                 {mode === "ranges" && p.sous_categories?.nom && (
                   <p className="text-[11px] text-brand truncate">{p.sous_categories.nom}</p>
                 )}
@@ -265,6 +312,61 @@ export default function AdminClassement() {
           );
         })}
       </div>
+        </>
+      )}
+
+      {/* Modification des prix des articles rangés */}
+      {mode === "prix" && (
+        <div className="space-y-2">
+          {produits.map((p) => {
+            const e = edits[p.id] || {};
+            const prixVal = e.prix ?? String(p.prix ?? "");
+            const deviseVal = e.devise ?? p.devise ?? "USD";
+            const modifie = Number(prixVal) !== Number(p.prix) || deviseVal !== (p.devise || "USD");
+            const valide = prixVal !== "" && Number(prixVal) > 0;
+            const etat = sauvegarde[p.id];
+            return (
+              <div key={p.id} className="bg-white rounded-xl p-3 flex flex-wrap items-center gap-3">
+                {p.photo_thumb_url || p.photo_url ? (
+                  <img src={p.photo_thumb_url || p.photo_url} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0" />
+                )}
+                <div className="min-w-0 flex-1 basis-40">
+                  <p className="text-sm font-semibold text-[#1B1B1B] truncate">{p.nom}</p>
+                  <p className="text-[11px] text-gray-400 truncate">
+                    {p.boutiques?.nom}{p.sous_categories?.nom ? ` · ${p.sous_categories.nom}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="decimal" min="0" step="any" value={prixVal}
+                    onChange={(ev) => setEdits((x) => ({ ...x, [p.id]: { ...x[p.id], prix: ev.target.value } }))}
+                    className="border border-gray-200 rounded-md px-2 py-1.5 text-sm w-24"
+                  />
+                  <select
+                    value={deviseVal}
+                    onChange={(ev) => setEdits((x) => ({ ...x, [p.id]: { ...x[p.id], devise: ev.target.value } }))}
+                    className="border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="CDF">CDF</option>
+                  </select>
+                  <button
+                    onClick={() => enregistrerPrix(p)}
+                    disabled={!modifie || !valide || etat === "en_cours"}
+                    className="bg-brand text-white text-sm font-semibold rounded-md px-3 py-1.5 disabled:opacity-40"
+                  >
+                    {etat === "en_cours" ? "..." : "Enregistrer"}
+                  </button>
+                </div>
+                {etat === "ok" && <span className="text-xs text-green-600 basis-full">✓ Prix modifié</span>}
+                {etat && etat !== "ok" && etat !== "en_cours" && <span className="text-xs text-red-500 basis-full">{etat}</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {!chargement && produits.length === 0 && !erreur && (
         <p className="text-center text-sm text-gray-400 py-10">
