@@ -53,6 +53,11 @@ export default function AdminClassement() {
   const [edits, setEdits] = useState({}); // id -> { prix, devise }
   const [sauvegarde, setSauvegarde] = useState({}); // id -> "en_cours" | "ok" | message d'erreur
 
+  // Articles en rupture : quantités en cours de saisie et état de chaque enregistrement
+  const [editsStock, setEditsStock] = useState({}); // id -> quantité saisie
+  const [sauvegardeStock, setSauvegardeStock] = useState({}); // id -> "en_cours" | message d'erreur
+  const [stockAleatoireEnCours, setStockAleatoireEnCours] = useState(false);
+
   // --- Catégories (au démarrage) ---
   useEffect(() => {
     (async () => {
@@ -190,6 +195,53 @@ export default function AdminClassement() {
     }
   };
 
+  // Remet une quantité sur un article en rupture : une fois > 0, il quitte la liste
+  const enregistrerStock = async (p) => {
+    const valeur = editsStock[p.id];
+    const stock = Number(valeur);
+    if (valeur === undefined || valeur === "" || !Number.isInteger(stock) || stock < 1) return;
+    setSauvegardeStock((x) => ({ ...x, [p.id]: "en_cours" }));
+    try {
+      const res = await fetchAvecDelai(`${API_URL}/api/admin-classement/produits/${p.id}/stock`, {
+        method: "PUT",
+        headers: await enTetes(),
+        body: JSON.stringify({ stock }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Échec de l'enregistrement");
+      setProduits((prev) => prev.filter((x) => x.id !== p.id));
+      setTotal((t) => Math.max(0, t - 1));
+      setEditsStock((prev) => { const n = { ...prev }; delete n[p.id]; return n; });
+      setSauvegardeStock((x) => { const n = { ...x }; delete n[p.id]; return n; });
+    } catch (err) {
+      setSauvegardeStock((x) => ({ ...x, [p.id]: err.name === "AbortError" ? "Le serveur met trop de temps à répondre." : err.message }));
+    }
+  };
+
+  // Donne un stock au hasard (1 à 100) à tous les articles en rupture affichés
+  const remplirAuHasard = async () => {
+    if (produits.length === 0) return;
+    if (!window.confirm(`Donner un stock aléatoire (1 à 100) aux ${produits.length} article(s) affichés ?`)) return;
+    setStockAleatoireEnCours(true);
+    setErreur("");
+    setMessage("");
+    try {
+      const res = await fetchAvecDelai(`${API_URL}/api/admin-classement/stock-aleatoire`, {
+        method: "POST",
+        headers: await enTetes(),
+        body: JSON.stringify({ produit_ids: produits.map((p) => p.id) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Échec de la mise à jour");
+      setMessage(`${data.modifies} article(s) remis en stock.`);
+      await charger(1);
+    } catch (err) {
+      setErreur(err.name === "AbortError" ? "Le serveur met trop de temps à répondre." : err.message);
+    } finally {
+      setStockAleatoireEnCours(false);
+    }
+  };
+
   const chip = (actif) =>
     `whitespace-nowrap text-sm font-semibold px-3.5 py-1.5 rounded-full border ${
       actif ? "bg-brand text-white border-brand" : "bg-white text-[#1B1B1B] border-gray-200"
@@ -214,6 +266,7 @@ export default function AdminClassement() {
         <button onClick={() => setMode("a_ranger")} className={chip(mode === "a_ranger")}>À ranger</button>
         <button onClick={() => setMode("ranges")} className={chip(mode === "ranges")}>Déjà rangés</button>
         <button onClick={() => setMode("prix")} className={chip(mode === "prix")}>Modifier les prix</button>
+        <button onClick={() => setMode("rupture")} className={chip(mode === "rupture")}>En rupture</button>
         <span className="text-sm text-gray-500 ml-auto">{total} article(s)</span>
       </div>
 
@@ -225,7 +278,7 @@ export default function AdminClassement() {
         className="w-full sm:w-80 border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
       />
 
-      {mode !== "prix" && (
+      {mode !== "prix" && mode !== "rupture" && (
       <div className="bg-white rounded-xl p-4 space-y-2">
         <p className="text-sm text-gray-500">Ranger les articles cochés dans :</p>
         {racines.length === 0 ? (
@@ -254,7 +307,7 @@ export default function AdminClassement() {
       {message && <p className="text-sm text-green-600">{message}</p>}
       {erreur && <p className="text-sm text-red-500">{erreur}</p>}
 
-      {mode !== "prix" && (
+      {mode !== "prix" && mode !== "rupture" && (
         <>
       {/* Barre d'action */}
       <div className="sticky top-0 z-10 bg-[#F3F3F3] py-2 flex flex-wrap items-center gap-3">
@@ -315,6 +368,57 @@ export default function AdminClassement() {
         </>
       )}
 
+      {/* Articles en rupture : remettre une quantité */}
+      {mode === "rupture" && (
+        <div className="space-y-2">
+          {produits.length > 0 && (
+            <button
+              onClick={remplirAuHasard}
+              disabled={stockAleatoireEnCours}
+              className="text-sm font-semibold text-brand disabled:opacity-40"
+            >
+              {stockAleatoireEnCours ? "Mise à jour..." : `Remplir au hasard (1 à 100) les ${produits.length} affichés`}
+            </button>
+          )}
+          {produits.map((p) => {
+            const valeur = editsStock[p.id] ?? "";
+            const valide = valeur !== "" && Number.isInteger(Number(valeur)) && Number(valeur) >= 1;
+            const etat = sauvegardeStock[p.id];
+            return (
+              <div key={p.id} className="bg-white rounded-xl p-3 flex flex-wrap items-center gap-3">
+                {p.photo_thumb_url || p.photo_url ? (
+                  <img src={p.photo_thumb_url || p.photo_url} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0" />
+                )}
+                <div className="min-w-0 flex-1 basis-40">
+                  <p className="text-sm font-semibold text-[#1B1B1B] truncate">{p.nom}</p>
+                  <p className="text-[11px] text-gray-400 truncate">
+                    {p.boutiques?.nom}{p.sous_categories?.nom ? ` · ${p.sous_categories.nom}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="numeric" min="1" step="1" value={valeur} placeholder="Quantité"
+                    onChange={(ev) => setEditsStock((x) => ({ ...x, [p.id]: ev.target.value }))}
+                    onKeyDown={(ev) => { if (ev.key === "Enter") enregistrerStock(p); }}
+                    className="border border-gray-200 rounded-md px-2 py-1.5 text-sm w-24"
+                  />
+                  <button
+                    onClick={() => enregistrerStock(p)}
+                    disabled={!valide || etat === "en_cours"}
+                    className="bg-brand text-white text-sm font-semibold rounded-md px-3 py-1.5 disabled:opacity-40"
+                  >
+                    {etat === "en_cours" ? "..." : "Enregistrer"}
+                  </button>
+                </div>
+                {etat && etat !== "en_cours" && <span className="text-xs text-red-500 basis-full">{etat}</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Modification des prix des articles rangés */}
       {mode === "prix" && (
         <div className="space-y-2">
@@ -370,7 +474,11 @@ export default function AdminClassement() {
 
       {!chargement && produits.length === 0 && !erreur && (
         <p className="text-center text-sm text-gray-400 py-10">
-          {mode === "a_ranger" ? "Tous les articles de cette catégorie sont rangés. 🎉" : "Aucun article rangé pour le moment."}
+          {mode === "a_ranger"
+            ? "Tous les articles de cette catégorie sont rangés. 🎉"
+            : mode === "rupture"
+              ? "Aucun article en rupture dans cette catégorie. 🎉"
+              : "Aucun article rangé pour le moment."}
         </p>
       )}
       {chargement && <p className="text-center text-sm text-gray-400 py-4">Chargement...</p>}
