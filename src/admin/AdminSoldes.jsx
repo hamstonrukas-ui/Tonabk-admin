@@ -55,6 +55,20 @@ export default function AdminSoldes() {
 
   useEffect(() => { charger(); }, []);
 
+  // Enregistre une vente faite hors application (WhatsApp...) : +1 ou -1
+  async function changerVendus(id, delta) {
+    setErreurListe("");
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_URL}/api/soldes/${id}/vendus`, { method: "POST", headers, body: JSON.stringify({ delta }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+      setSoldes((prev) => prev.map((x) => (x.id === id ? data : x)));
+    } catch (e) {
+      setErreurListe(e.message || "Impossible de mettre à jour les ventes");
+    }
+  }
+
   async function uploaderPhotos(fichiers) {
     const headers = await authHeaders(false);
     const urls = [];
@@ -242,6 +256,30 @@ export default function AdminSoldes() {
                     <span style={{ color: "#F5720C", fontWeight: 700 }}>{fmt(s.prix_solde, s.devise)}</span>
                     {" · fin le "}{new Date(s.expire_le).toLocaleString("fr-FR")}
                   </div>
+                  {s.quantite > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, flexWrap: "wrap" }}>
+                      <span>
+                        Vendus <strong>{s.vendus_total ?? 0}</strong> / {s.quantite} · Reste{" "}
+                        <strong style={{ color: s.restant === 0 ? "red" : "#2E7D32" }}>{s.restant ?? s.quantite}</strong>
+                        {s.restant === 0 ? " — STOCK ÉCOULÉ" : ""}
+                        {s.vendus_auto > 0 ? ` (dont ${s.vendus_auto} via « Livre-moi »)` : ""}
+                      </span>
+                      <button
+                        onClick={() => changerVendus(s.id, -1)}
+                        disabled={(s.vendus || 0) <= 0}
+                        style={{ border: "1px solid #ddd", background: "#fff", borderRadius: 6, padding: "2px 10px", opacity: (s.vendus || 0) <= 0 ? 0.4 : 1 }}
+                      >
+                        −1
+                      </button>
+                      <button
+                        onClick={() => changerVendus(s.id, 1)}
+                        disabled={s.restant === 0}
+                        style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "2px 10px", fontWeight: 600, opacity: s.restant === 0 ? 0.4 : 1 }}
+                      >
+                        +1 vendu
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
