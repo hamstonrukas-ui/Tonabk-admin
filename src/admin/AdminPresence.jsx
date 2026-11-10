@@ -8,15 +8,72 @@ async function authHeaders() {
 }
 
 // Position GPS du téléphone.
-function obtenirPosition() {
+const MESSAGES_POSITION = {
+  refus: "Position refusée — autorisez la géolocalisation pour continuer",
+  indisponible: "Position introuvable — activez le GPS et les données mobiles, puis réessayez",
+  delai: "La localisation prend trop de temps — réessayez près d'une fenêtre ou à l'extérieur",
+  absent: "Géolocalisation non disponible sur cet appareil",
+};
+function erreurPosition(type) {
+  const e = new Error(MESSAGES_POSITION[type]);
+  e.type = type;
+  return e;
+}
+
+function essayerPosition(options) {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error("Géolocalisation non disponible sur cet appareil"));
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => reject(new Error("Position refusée — autorisez la géolocalisation pour continuer")),
-      { enableHighAccuracy: true, timeout: 15000 }
+      reject,
+      options
     );
   });
+}
+
+async function obtenirPosition() {
+  if (!navigator.geolocation) throw erreurPosition("absent");
+  try {
+    return await essayerPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  } catch (err) {
+    if (err.code === 1) throw erreurPosition("refus");
+    // GPS précis trop long ou indisponible (fréquent à l'intérieur) : 2e essai avec la position réseau/Wi-Fi
+    try {
+      return await essayerPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+    } catch (err2) {
+      throw erreurPosition(err2.code === 1 ? "refus" : err2.code === 3 ? "delai" : "indisponible");
+    }
+  }
+}
+
+// Aide affichée quand la position est refusée : les réglages diffèrent entre iPhone et Android
+function AidePosition({ onReessayer }) {
+  const iphone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const etapes = iphone
+    ? [
+        "Si le lien s'est ouvert dans WhatsApp : touche « … » puis « Ouvrir dans Safari ».",
+        "Réglages du téléphone › Confidentialité et sécurité › Service de localisation : activé.",
+        "Dans cette même liste, « Sites web Safari » : choisis « Lorsque l'app est active ».",
+        "Dans Safari, touche « aA » (barre d'adresse) › Réglages du site web › Position › « Autoriser ».",
+      ]
+    : [
+        "Active la localisation du téléphone (icône « Position » du menu rapide).",
+        "Dans Chrome, touche le cadenas à gauche de l'adresse › Autorisations › Position › Autoriser.",
+        "Si le lien s'est ouvert dans WhatsApp, ouvre-le dans Chrome (menu ⋮ › Ouvrir dans le navigateur).",
+      ];
+  return (
+    <div style={{ background: "#FFF8F0", border: "1px solid #F5720C", borderRadius: 8, padding: 12, fontSize: 13, marginBottom: 12 }}>
+      <p style={{ margin: "0 0 6px", fontWeight: 700 }}>Comment autoriser la position :</p>
+      <ol style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+        {etapes.map((e) => <li key={e} style={{ marginBottom: 4 }}>{e}</li>)}
+      </ol>
+      <button
+        onClick={onReessayer}
+        style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", fontWeight: 600 }}
+      >
+        Réessayer
+      </button>
+    </div>
+  );
 }
 
 // Adresse générale du point (rue/quartier) — service gratuit OpenStreetMap.
@@ -84,6 +141,7 @@ export default function AdminPresence() {
   const [difficultes, setDifficultes] = useState("");
   const [afficherCloture, setAfficherCloture] = useState(false);
   const [positionAConfirmer, setPositionAConfirmer] = useState(null); // { lat, lng, adresse }
+  const [aideRefus, setAideRefus] = useState(false); // afficher l'aide « autoriser la position »
 
   async function charger() {
     setErreur("");
@@ -107,6 +165,7 @@ export default function AdminPresence() {
   // Étape 1 : localiser et montrer la carte, sans encore rien enregistrer.
   const localiser = async () => {
     setErreur("");
+    setAideRefus(false);
     setEnCours(true);
     try {
       setEtapeEnCours("Localisation en cours...");
@@ -116,6 +175,7 @@ export default function AdminPresence() {
       setPositionAConfirmer({ lat, lng, adresse });
     } catch (err) {
       setErreur(err.message);
+      setAideRefus(err.type === "refus");
     }
     setEnCours(false);
     setEtapeEnCours("");
@@ -196,6 +256,7 @@ export default function AdminPresence() {
       <p style={{ color: "#999", fontSize: 13, marginTop: 0, textTransform: "capitalize" }}>{fmtDate(new Date().toISOString())}</p>
 
       {erreur && <p style={{ color: "red", fontSize: 13 }}>{erreur}</p>}
+      {aideRefus && <AidePosition onReessayer={localiser} />}
 
       {/* Aucune présence aujourd'hui, et pas encore de position repérée */}
       {!presence && !positionAConfirmer && (
