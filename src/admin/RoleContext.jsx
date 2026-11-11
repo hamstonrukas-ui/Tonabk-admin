@@ -7,9 +7,9 @@ export function useRole() {
   return useContext(RoleContext);
 }
 
-// Enveloppe une page réservée à l'admin complet : l'admin secondaire est renvoyé vers la liste des boutiques.
+// Enveloppe une page réservée à l'admin complet : l'admin secondaire est renvoyé vers ses missions.
 export function SeulementAdmin({ children }) {
   const role = useRole();
-  if (role !== "admin") return <Navigate to="/toutes-boutiques" replace />;
+  if (role !== "admin") return <Navigate to="/mes-missions" replace />;
   return children;
 }
