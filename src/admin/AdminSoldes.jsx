@@ -32,6 +32,7 @@ export default function AdminSoldes() {
 
   const [form, setForm] = useState(videForm);
   const [photos, setPhotos] = useState([]);
+  const [audioFichier, setAudioFichier] = useState(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -39,6 +40,9 @@ export default function AdminSoldes() {
   const [editForm, setEditForm] = useState(videForm);
   const [editPhotos, setEditPhotos] = useState([]);
   const [editPhotosExistantes, setEditPhotosExistantes] = useState([]);
+  const [editAudioFichier, setEditAudioFichier] = useState(null);
+  const [editAudioExistant, setEditAudioExistant] = useState(null);
+  const [resteSaisi, setResteSaisi] = useState({}); // id -> reste tapé à la main
   const [editEnvoiEnCours, setEditEnvoiEnCours] = useState(false);
   const [editErreur, setEditErreur] = useState("");
 
@@ -69,6 +73,33 @@ export default function AdminSoldes() {
     }
   }
 
+  // Fixe directement la quantité restante (ce que voient les clients)
+  async function definirReste(id) {
+    const valeur = resteSaisi[id];
+    if (valeur === undefined || valeur === "") return;
+    setErreurListe("");
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_URL}/api/soldes/${id}/reste`, { method: "POST", headers, body: JSON.stringify({ restant: Number(valeur) }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+      setSoldes((prev) => prev.map((x) => (x.id === id ? data : x)));
+      setResteSaisi((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    } catch (e) {
+      setErreurListe(e.message || "Impossible de définir le reste");
+    }
+  }
+
+  async function uploaderAudio(fichier) {
+    const headers = await authHeaders(false);
+    const formData = new FormData();
+    formData.append("audio", fichier);
+    const res = await fetch(`${API_URL}/api/upload/audio-solde`, { method: "POST", headers, body: formData });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Échec de l'envoi de l'audio");
+    return data.url;
+  }
+
   async function uploaderPhotos(fichiers) {
     const headers = await authHeaders(false);
     const urls = [];
@@ -95,6 +126,7 @@ export default function AdminSoldes() {
     setEnvoiEnCours(true);
     try {
       const urls = await uploaderPhotos(photos);
+      const audioUrl = audioFichier ? await uploaderAudio(audioFichier) : null;
       const headers = await authHeaders();
       const res = await fetch(`${API_URL}/api/soldes`, {
         method: "POST", headers,
@@ -106,6 +138,7 @@ export default function AdminSoldes() {
           expire_le: new Date(form.expire_le).toISOString(),
           photos: urls,
           photo_url: urls[0] || null,
+          audio_url: audioUrl,
         }),
       });
       const data = await res.json();
@@ -113,6 +146,7 @@ export default function AdminSoldes() {
 
       setForm(videForm);
       setPhotos([]);
+      setAudioFichier(null);
       charger();
     } catch (err) {
       setErreur(err.message || "Erreur de connexion");
@@ -129,6 +163,8 @@ export default function AdminSoldes() {
       expire_le: versDatetimeLocal(s.expire_le),
     });
     setEditPhotos([]);
+    setEditAudioFichier(null);
+    setEditAudioExistant(s.audio_url || null);
     setEditPhotosExistantes(s.photos?.length ? s.photos : (s.photo_url ? [s.photo_url] : []));
     setEditErreur("");
   };
@@ -140,6 +176,7 @@ export default function AdminSoldes() {
     try {
       const urlsNouvelles = await uploaderPhotos(editPhotos);
       const toutesLesPhotos = [...editPhotosExistantes, ...urlsNouvelles];
+      const audioUrl = editAudioFichier ? await uploaderAudio(editAudioFichier) : editAudioExistant;
 
       const headers = await authHeaders();
       const res = await fetch(`${API_URL}/api/soldes/${editId}`, {
@@ -152,6 +189,7 @@ export default function AdminSoldes() {
           expire_le: new Date(editForm.expire_le).toISOString(),
           photos: toutesLesPhotos,
           photo_url: toutesLesPhotos[0] || null,
+          audio_url: audioUrl || null,
         }),
       });
       const data = await res.json();
@@ -230,6 +268,18 @@ export default function AdminSoldes() {
           </label>
         )}
 
+        <div style={{ border: "1px solid #eee", borderRadius: 8, padding: 10 }}>
+          <p style={{ margin: "0 0 6px", fontSize: 12, color: "#666", fontWeight: 600 }}>🔊 Audio de l'annonce (optionnel, 8 Mo max)</p>
+          {audioFichier ? (
+            <div style={{ fontSize: 12 }}>
+              <span style={{ color: "#2E7D32", fontWeight: 600 }}>✓ {audioFichier.name}</span>{" "}
+              <button type="button" onClick={() => setAudioFichier(null)} style={{ color: "red", background: "none", border: "none" }}>Retirer</button>
+            </div>
+          ) : (
+            <input type="file" accept="audio/*" onChange={(e) => { setAudioFichier(e.target.files?.[0] || null); e.target.value = ""; }} />
+          )}
+        </div>
+
         <button type="submit" disabled={envoiEnCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}>
           {envoiEnCours ? "Création..." : "Publier le solde"}
         </button>
@@ -259,27 +309,40 @@ export default function AdminSoldes() {
                   {s.quantite > 0 && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, flexWrap: "wrap" }}>
                       <span>
-                        Vendus <strong>{s.vendus_total ?? 0}</strong> / {s.quantite} · Reste{" "}
-                        <strong style={{ color: s.restant === 0 ? "red" : "#2E7D32" }}>{s.restant ?? s.quantite}</strong>
+                        Reste <strong style={{ color: s.restant === 0 ? "red" : "#2E7D32" }}>{s.restant ?? s.quantite}</strong> / {s.quantite}
                         {s.restant === 0 ? " — STOCK ÉCOULÉ" : ""}
-                        {s.vendus_auto > 0 ? ` (dont ${s.vendus_auto} via « Livre-moi »)` : ""}
                       </span>
-                      <button
-                        onClick={() => changerVendus(s.id, -1)}
-                        disabled={(s.vendus || 0) <= 0}
-                        style={{ border: "1px solid #ddd", background: "#fff", borderRadius: 6, padding: "2px 10px", opacity: (s.vendus || 0) <= 0 ? 0.4 : 1 }}
-                      >
-                        −1
-                      </button>
                       <button
                         onClick={() => changerVendus(s.id, 1)}
                         disabled={s.restant === 0}
                         style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "2px 10px", fontWeight: 600, opacity: s.restant === 0 ? 0.4 : 1 }}
                       >
-                        +1 vendu
+                        − 1
+                      </button>
+                      <button
+                        onClick={() => changerVendus(s.id, -1)}
+                        disabled={(s.vendus || 0) <= 0}
+                        style={{ border: "1px solid #ddd", background: "#fff", borderRadius: 6, padding: "2px 10px", opacity: (s.vendus || 0) <= 0 ? 0.4 : 1 }}
+                      >
+                        + 1
+                      </button>
+                      <input
+                        type="number" inputMode="numeric" min="0" max={s.quantite} placeholder="Reste"
+                        value={resteSaisi[s.id] ?? ""}
+                        onChange={(e) => setResteSaisi((x) => ({ ...x, [s.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === "Enter") definirReste(s.id); }}
+                        style={{ width: 64, border: "1px solid #ddd", borderRadius: 6, padding: "3px 6px" }}
+                      />
+                      <button
+                        onClick={() => definirReste(s.id)}
+                        disabled={(resteSaisi[s.id] ?? "") === ""}
+                        style={{ border: "1px solid #F5720C", color: "#F5720C", background: "#fff", borderRadius: 6, padding: "2px 10px", fontWeight: 600, opacity: (resteSaisi[s.id] ?? "") === "" ? 0.4 : 1 }}
+                      >
+                        Définir
                       </button>
                     </div>
                   )}
+                  {s.audio_url && <div style={{ fontSize: 11, color: "#2E7D32", marginTop: 4 }}>🔊 Audio ajouté</div>}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
@@ -343,6 +406,24 @@ export default function AdminSoldes() {
                       }} />
                   </label>
                 )}
+
+                <div style={{ border: "1px solid #eee", borderRadius: 8, padding: 10, background: "#fff" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 12, color: "#666", fontWeight: 600 }}>🔊 Audio de l'annonce (8 Mo max)</p>
+                  {editAudioExistant && !editAudioFichier && (
+                    <div style={{ marginBottom: 6 }}>
+                      <audio src={editAudioExistant} controls style={{ width: "100%" }} />
+                      <button type="button" onClick={() => setEditAudioExistant(null)} style={{ color: "red", background: "none", border: "none", fontSize: 12 }}>Retirer l'audio</button>
+                    </div>
+                  )}
+                  {editAudioFichier ? (
+                    <div style={{ fontSize: 12 }}>
+                      <span style={{ color: "#2E7D32", fontWeight: 600 }}>✓ {editAudioFichier.name}</span>{" "}
+                      <button type="button" onClick={() => setEditAudioFichier(null)} style={{ color: "red", background: "none", border: "none" }}>Annuler</button>
+                    </div>
+                  ) : (
+                    <input type="file" accept="audio/*" onChange={(e) => { setEditAudioFichier(e.target.files?.[0] || null); e.target.value = ""; }} />
+                  )}
+                </div>
 
                 <button type="submit" disabled={editEnvoiEnCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}>
                   {editEnvoiEnCours ? "Enregistrement..." : "Enregistrer les modifications"}
