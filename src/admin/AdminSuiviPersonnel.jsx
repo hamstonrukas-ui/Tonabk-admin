@@ -31,6 +31,7 @@ export default function AdminSuiviPersonnel() {
       try {
         const res = await fetch(`${API_URL}/api/suivi-personnel/${id}`, { headers: await authHeaders() });
         if (res.ok) setInfos(await res.json());
+        else if (res.status === 404) setErreur("Le suivi du personnel n'est pas disponible sur le serveur (route introuvable). Redéployez le backend.");
         else setErreur((await res.json().catch(() => ({}))).error || `Erreur ${res.status}`);
       } catch {
         setErreur("Impossible de contacter le serveur");
@@ -38,10 +39,18 @@ export default function AdminSuiviPersonnel() {
     })();
   }, [id]);
 
-  if (erreur) return <p style={{ color: "red" }}>{erreur}</p>;
+  if (erreur) return (
+    <div>
+      <Link to="/personnel" style={{ fontSize: 13, color: "#F5720C" }}>← Retour au personnel</Link>
+      <p style={{ color: "red" }}>{erreur}</p>
+    </div>
+  );
   if (!infos) return <p>Chargement...</p>;
 
-  const { jours } = infos;
+  // Sécurité : une réponse inattendue du serveur ne doit jamais provoquer de page blanche
+  const jours = (Array.isArray(infos.jours) ? infos.jours : [])
+    .filter((j) => j && j.date)
+    .map((j) => ({ ...j, date: String(j.date).slice(0, 10) }));
   const moisCourant = new Date().toISOString().slice(0, 7);
   const joursMois = jours.filter((j) => j.date.startsWith(moisCourant)).length;
   const nonCloturees = jours.filter((j) => !j.heure_fin).length;
