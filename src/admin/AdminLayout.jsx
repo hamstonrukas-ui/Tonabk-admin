@@ -28,6 +28,7 @@ export default function AdminLayout() {
           {complet && <NavLink to="/missions">Missions</NavLink>}
           {!complet && <NavLink to="/mes-missions">Mes missions</NavLink>}
           {complet && <NavLink to="/soldes">Soldes</NavLink>}
+          {complet && <NavLink to="/nouveautes">Nouveautés</NavLink>}
           {complet && <NavLink to="/recuperation">Récupération</NavLink>}
           <NavLink to="/livraisons">{complet ? "Livraisons" : "Mes livraisons"}</NavLink>
           <NavLink to="/presence">{complet ? "Présence" : "Présence et historique"}</NavLink>
