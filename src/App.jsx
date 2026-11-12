@@ -15,6 +15,7 @@ import AdminRecuperationBoutique from "./admin/AdminRecuperationBoutique";
 import AdminClassement from "./admin/AdminClassement";
 import AdminLivraisons from "./admin/AdminLivraisons";
 import AdminMissions from "./admin/AdminMissions";
+import AdminNouveautes from "./admin/AdminNouveautes";
 import AdminMesMissions from "./admin/AdminMesMissions";
 import AdminLogin from "./admin/AdminLogin";
 import DefinirMotDePasse from "./admin/DefinirMotDePasse";
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="soldes" element={<SeulementAdmin><AdminSoldes /></SeulementAdmin>} />
           <Route path="presence" element={<AdminPresence />} />
           <Route path="missions" element={<SeulementAdmin><AdminMissions /></SeulementAdmin>} />
+          <Route path="nouveautes" element={<SeulementAdmin><AdminNouveautes /></SeulementAdmin>} />
           <Route path="mes-missions" element={<AdminMesMissions />} />
           <Route path="livraisons" element={<AdminLivraisons />} />
           <Route path="recuperation" element={<SeulementAdmin><AdminRecuperationBoutique /></SeulementAdmin>} />
