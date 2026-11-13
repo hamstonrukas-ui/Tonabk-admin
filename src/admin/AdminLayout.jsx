@@ -18,6 +18,7 @@ export default function AdminLayout() {
         {!complet && <p style={{ fontSize: 11, color: "#aaa", marginBottom: 16 }}>Espace employé</p>}
         <nav style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
           {complet && <NavLink to="/" end>Vue d'ensemble</NavLink>}
+          {complet && <NavLink to="/statistiques">Statistiques</NavLink>}
           {complet && <NavLink to="/boutiques">Boutiques à valider</NavLink>}
           <NavLink to="/toutes-boutiques">{complet ? "Toutes les boutiques" : "Boutiques"}</NavLink>
           {complet && <NavLink to="/classement">Classer les articles</NavLink>}
