@@ -99,7 +99,7 @@ export default function AdminNouveautes() {
 
   return (
     <div style={{ maxWidth: 560 }}>
-      <h1>Nouveautés</h1>
+      <h1>Mali mupya</h1>
       <p style={{ fontSize: 13, color: "#666" }}>Statuts visibles 48 h dans le menu de l'application. Les commerçants peuvent aussi en publier ; vous pouvez supprimer n'importe laquelle.</p>
 
       <form onSubmit={publier} style={{ background: "#fff", borderRadius: 12, padding: 16, marginBottom: 20, display: "flex", flexDirection: "column", gap: 8 }}>
