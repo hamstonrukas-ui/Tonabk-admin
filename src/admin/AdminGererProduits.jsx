@@ -54,6 +54,30 @@ export default function AdminGererProduits() {
   const [editEnvoiEnCours, setEditEnvoiEnCours] = useState(false);
   const [editErreur, setEditErreur] = useState("");
 
+  // Repères (numéro + source des photos)
+  const [reperes, setReperes] = useState({}); // produit_id -> { code, fournisseur_nom, fournisseur_contact, note }
+  const [srcNom, setSrcNom] = useState("");
+  const [srcContact, setSrcContact] = useState("");
+  const [srcNote, setSrcNote] = useState("");
+  const [lotSrcNom, setLotSrcNom] = useState("");
+  const [lotSrcContact, setLotSrcContact] = useState("");
+  const [editSrcNom, setEditSrcNom] = useState("");
+  const [editSrcContact, setEditSrcContact] = useState("");
+  const [editSrcNote, setEditSrcNote] = useState("");
+
+  const enregistrerRepere = async (produitId, nom, contact, note = "") => {
+    if (!nom.trim() && !contact.trim() && !note.trim()) return;
+    try {
+      await fetchAvecDelai(`${API_URL}/api/reperes/produit/${produitId}`, {
+        method: "PUT",
+        headers: await authHeaders(),
+        body: JSON.stringify({ fournisseur_nom: nom, fournisseur_contact: contact, note }),
+      });
+    } catch {
+      /* le produit est créé ; le repère pourra être ajouté via « Modifier » */
+    }
+  };
+
   const MAX_PAR_LOT = 10;
   const [afficherLot, setAfficherLot] = useState(false);
   const [deviseLot, setDeviseLot] = useState("USD");
@@ -137,6 +161,8 @@ export default function AdminGererProduits() {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || "Échec de l'ajout du produit");
         }
+        const produitCree = await res.json().catch(() => null);
+        if (produitCree?.id) await enregistrerRepere(produitCree.id, lotSrcNom, lotSrcContact);
       } catch (err) {
         restantes.push({ ...ligne, erreur: err.message || "Erreur" });
       }
@@ -148,6 +174,7 @@ export default function AdminGererProduits() {
     charger();
     if (restantes.length === 0) {
       setAfficherLot(false);
+      setLotSrcNom(""); setLotSrcContact("");
       setLotRacineId("");
       setLotTypeId("");
     }
@@ -164,6 +191,12 @@ export default function AdminGererProduits() {
       ]);
       if (resB.ok) setBoutique(await resB.json());
       if (resP.ok) setProduits(await resP.json());
+      try {
+        const resR = await fetchAvecDelai(`${API_URL}/api/reperes/boutique/${id}`, { headers });
+        if (resR.ok) setReperes(await resR.json());
+      } catch {
+        /* repères indisponibles : le reste de la page fonctionne */
+      }
     } catch (err) {
       setErreur(err.name === "AbortError" ? "Le serveur met trop de temps à répondre." : "Connexion au serveur impossible.");
     }
@@ -247,6 +280,9 @@ export default function AdminGererProduits() {
         return;
       }
 
+      const produitCree = await res.json().catch(() => null);
+      if (produitCree?.id) await enregistrerRepere(produitCree.id, srcNom, srcContact, srcNote);
+      setSrcNom(""); setSrcContact(""); setSrcNote("");
       setNom(""); setPrix(""); setDevise("USD"); setPrixGros(""); setQuantiteMinGros(""); setStock(""); setDescription(""); setPhoto(null);
       charger();
     } catch (err) {
@@ -270,6 +306,10 @@ export default function AdminGererProduits() {
     setEditDescription(p.description || "");
     setEditPhoto(null);
     setEditErreur("");
+    const r = reperes[p.id] || {};
+    setEditSrcNom(r.fournisseur_nom || "");
+    setEditSrcContact(r.fournisseur_contact || "");
+    setEditSrcNote(r.note || "");
   };
 
   const modifierProduit = async (e) => {
@@ -326,6 +366,7 @@ export default function AdminGererProduits() {
         return;
       }
 
+      await enregistrerRepere(editId, editSrcNom, editSrcContact, editSrcNote);
       setEditId(null);
       charger();
     } catch (err) {
@@ -404,6 +445,15 @@ export default function AdminGererProduits() {
                 </div>
               )}
 
+
+        <div style={{ background: "#FFF7F0", border: "1px dashed #F5720C", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <p style={{ fontSize: 12, color: "#B25000", margin: 0 }}>
+            Repère (privé, jamais visible du public) — d'où vient cette photo ? Un numéro de repère est attribué automatiquement.
+          </p>
+          <input value={lotSrcNom} onChange={(e) => setLotSrcNom(e.target.value)} placeholder="Source / fournisseur (ex : TikTok @modeKinshasa)" />
+          <input value={lotSrcContact} onChange={(e) => setLotSrcContact(e.target.value)} placeholder="Contact du fournisseur (téléphone, lien…)" />
+        </div>
+
               {lignesLot.map((l) => (
                 <div key={l.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                   <img src={l.apercu} alt="" style={{ width: 52, height: 52, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
@@ -462,6 +512,15 @@ export default function AdminGererProduits() {
 
         <input value={stock} onChange={(e) => setStock(e.target.value)} type="number" placeholder="Stock" />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={2} />
+
+        <div style={{ background: "#FFF7F0", border: "1px dashed #F5720C", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <p style={{ fontSize: 12, color: "#B25000", margin: 0 }}>
+            Repère (privé, jamais visible du public) — d'où vient cette photo ? Un numéro de repère est attribué automatiquement.
+          </p>
+          <input value={srcNom} onChange={(e) => setSrcNom(e.target.value)} placeholder="Source / fournisseur (ex : TikTok @modeKinshasa)" />
+          <input value={srcContact} onChange={(e) => setSrcContact(e.target.value)} placeholder="Contact du fournisseur (téléphone, lien…)" />
+          <input value={srcNote} onChange={(e) => setSrcNote(e.target.value)} placeholder="Note (optionnel)" />
+        </div>
         <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files[0])} />
         <button type="submit" disabled={envoiEnCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}>
           {envoiEnCours ? "Ajout..." : "Ajouter le produit"}
@@ -476,6 +535,13 @@ export default function AdminGererProduits() {
               <div>
                 <strong>{p.nom}</strong> — {fmt(p.prix, p.devise)}
                 <div style={{ fontSize: 11, color: "#7A7A7A" }}>Stock : {p.stock}</div>
+                {reperes[p.id] && (
+                  <div style={{ fontSize: 11, color: "#B25000", marginTop: 2 }}>
+                    Repère <strong>#{reperes[p.id].code}</strong>
+                    {reperes[p.id].fournisseur_nom ? ` · ${reperes[p.id].fournisseur_nom}` : ""}
+                    {reperes[p.id].fournisseur_contact ? ` · ${reperes[p.id].fournisseur_contact}` : ""}
+                  </div>
+                )}
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button style={{ color: "#F5720C" }} onClick={() => (editId === p.id ? setEditId(null) : ouvrirEdition(p))}>
@@ -518,6 +584,16 @@ export default function AdminGererProduits() {
 
                 <input value={editStock} onChange={(e) => setEditStock(e.target.value)} type="number" placeholder="Stock" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Description" rows={2} />
+
+
+        <div style={{ background: "#FFF7F0", border: "1px dashed #F5720C", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <p style={{ fontSize: 12, color: "#B25000", margin: 0 }}>
+            Repère (privé, jamais visible du public) — d'où vient cette photo ? Un numéro de repère est attribué automatiquement.
+          </p>
+          <input value={editSrcNom} onChange={(e) => setEditSrcNom(e.target.value)} placeholder="Source / fournisseur (ex : TikTok @modeKinshasa)" />
+          <input value={editSrcContact} onChange={(e) => setEditSrcContact(e.target.value)} placeholder="Contact du fournisseur (téléphone, lien…)" />
+          <input value={editSrcNote} onChange={(e) => setEditSrcNote(e.target.value)} placeholder="Note (optionnel)" />
+        </div>
 
                 {p.photo_url && (
                   <img src={p.photo_url} alt="" style={{ width: 60, height: 60, borderRadius: 6, objectFit: "cover" }} />
