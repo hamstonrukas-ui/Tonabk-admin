@@ -78,7 +78,7 @@ export default function AdminGererProduits() {
     }
   };
 
-  const MAX_PAR_LOT = 10;
+  const MAX_PAR_LOT = 30;
   const [afficherLot, setAfficherLot] = useState(false);
   const [deviseLot, setDeviseLot] = useState("USD");
   const [lignesLot, setLignesLot] = useState([]); // { id, fichier, apercu, nom, prix, erreur }
