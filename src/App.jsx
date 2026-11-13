@@ -17,6 +17,7 @@ import AdminLivraisons from "./admin/AdminLivraisons";
 import AdminMissions from "./admin/AdminMissions";
 import AdminNouveautes from "./admin/AdminNouveautes";
 import AdminAnalytics from "./admin/AdminAnalytics";
+import AdminReperes from "./admin/AdminReperes";
 import AdminMesMissions from "./admin/AdminMesMissions";
 import AdminLogin from "./admin/AdminLogin";
 import DefinirMotDePasse from "./admin/DefinirMotDePasse";
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="presence" element={<AdminPresence />} />
           <Route path="missions" element={<SeulementAdmin><AdminMissions /></SeulementAdmin>} />
           <Route path="nouveautes" element={<SeulementAdmin><AdminNouveautes /></SeulementAdmin>} />
+          <Route path="reperes" element={<AdminReperes />} />
           <Route path="statistiques" element={<SeulementAdmin><AdminAnalytics /></SeulementAdmin>} />
           <Route path="mes-missions" element={<AdminMesMissions />} />
           <Route path="livraisons" element={<AdminLivraisons />} />
