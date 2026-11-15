@@ -6,6 +6,7 @@ import { API_URL } from "../lib/api";
 import { reduireImage } from "../lib/image";
 import { lireTailles, sauverTailles, composerDescription, TYPES } from "../lib/descriptionIA";
 import TaillesIA from "./TaillesIA";
+import { lireLignes, associer } from "../lib/collerDescriptions";
 
 const MAX_PHOTOS = 100;      // par série (on peut en faire autant qu'on veut, l'une après l'autre)
 const PARALLELE_IA = 3;      // analyses simultanées
@@ -44,6 +45,7 @@ export default function AdminImportIA() {
   const [stockFixe, setStockFixe] = useState("10");
   const [tailles, setTailles] = useState(lireTailles);
   const [commentaire, setCommentaire] = useState("");
+  const [texteColle, setTexteColle] = useState("");
   const [srcNom, setSrcNom] = useState("");
   const [srcContact, setSrcContact] = useState("");
   const [items, setItems] = useState([]);
@@ -88,6 +90,26 @@ export default function AdminImportIA() {
         etat: "attente", ia: null, titre: "", description: "", prix: prixDefaut, sous_categorie_id: null, type: "autre", tailles: "", inclure: false, erreur: "",
       })),
     ]);
+  };
+
+  // Descriptions rédigées ailleurs (ex. par Claude dans le chat) : une ligne par photo, associée par nom de fichier
+  const appliquerColle = () => {
+    setErreurGlobale(""); setMessage("");
+    const lignes = lireLignes(texteColle);
+    if (!lignes.length) return setErreurGlobale("Aucune ligne reconnue. Format : nom_du_fichier | titre | description | type");
+    const { maj: miseAJour, sansPhoto } = associer(lignes, itemsRef.current, sousCats);
+    if (!miseAJour.size) return setErreurGlobale("Aucune ligne ne correspond aux photos ajoutées (les noms de fichiers doivent être identiques).");
+    setItems((prev) => prev.map((i) => {
+      const m = miseAJour.get(i.cle);
+      if (!m) return i;
+      return {
+        ...i, ...m, etat: "pret", erreur: "", inclure: true,
+        ia: { utilisable: true, qualite: "bonne", probleme: "" },
+        tailles: taillesRef.current[m.type] || "",
+      };
+    }));
+    setMessage(`${miseAJour.size} photo(s) remplie(s)${sansPhoto.length ? ` · ${sansPhoto.length} ligne(s) sans photo : ${sansPhoto.slice(0, 5).join(", ")}${sansPhoto.length > 5 ? "…" : ""}` : ""}. Ajoutez maintenant les prix.`);
+    setTexteColle("");
   };
 
   const retirer = (cle) => {
@@ -269,6 +291,22 @@ export default function AdminImportIA() {
           <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={ajouterPhotos} />
         </label>
       </div>
+
+      {items.length > 0 && (
+        <details style={{ background: "#fff", borderRadius: 10, padding: 12, maxWidth: 560, marginTop: 12 }}>
+          <summary style={{ fontSize: 13, fontWeight: 600, color: "#B25000", cursor: "pointer" }}>
+            Coller des descriptions déjà rédigées (sans IA payante)
+          </summary>
+          <p style={{ fontSize: 12, color: "#666" }}>
+            Une ligne par photo : <code>nom_du_fichier | titre | description | type | sous-catégorie</code> (type : habit, pantalon, soulier ou autre ; sous-catégorie facultative).
+          </p>
+          <textarea value={texteColle} onChange={(e) => setTexteColle(e.target.value)} rows={6} style={{ ...champ, fontSize: 12 }}
+            placeholder="IMG_001.jpg | Combinaison bébé rayée | Combinaison douce bleue et blanche pour bébé. | habit" />
+          <button type="button" onClick={appliquerColle} disabled={!texteColle.trim() || occupe} style={{ ...bouton(!!texteColle.trim() && !occupe), marginTop: 6 }}>
+            Remplir les photos
+          </button>
+        </details>
+      )}
 
       {erreurGlobale && <p style={{ color: "red", fontSize: 13 }}>{erreurGlobale}</p>}
       {message && <p style={{ color: "#2E7D32", fontSize: 13 }}>{message}</p>}
