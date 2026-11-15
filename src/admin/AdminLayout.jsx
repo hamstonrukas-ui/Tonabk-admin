@@ -21,6 +21,8 @@ export default function AdminLayout() {
           {complet && <NavLink to="/statistiques">Statistiques</NavLink>}
           {complet && <NavLink to="/boutiques">Boutiques à valider</NavLink>}
           <NavLink to="/toutes-boutiques">{complet ? "Toutes les boutiques" : "Boutiques"}</NavLink>
+          {complet && <NavLink to="/import-ia">Import IA</NavLink>}
+          {complet && <NavLink to="/photos-cassees">Photos cassées</NavLink>}
           {complet && <NavLink to="/classement">Classer les articles</NavLink>}
           <NavLink to="/reperes">Repères</NavLink>
           {complet && <NavLink to="/requetes">Requêtes</NavLink>}
