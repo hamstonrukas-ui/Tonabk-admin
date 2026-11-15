@@ -52,7 +52,7 @@ export default function App() {
           <Route path="parrainages" element={<SeulementAdmin><AdminParrainages /></SeulementAdmin>} />
           <Route path="personnel" element={<SeulementAdmin><AdminPersonnel /></SeulementAdmin>} />
           <Route path="personnel/:id" element={<SeulementAdmin><AdminSuiviPersonnel /></SeulementAdmin>} />
-          <Route path="soldes" element={<SeulementAdmin><AdminSoldes /></SeulementAdmin>} />
+          <Route path="soldes" element={<AdminSoldes />} />
           <Route path="presence" element={<AdminPresence />} />
           <Route path="missions" element={<SeulementAdmin><AdminMissions /></SeulementAdmin>} />
           <Route path="nouveautes" element={<SeulementAdmin><AdminNouveautes /></SeulementAdmin>} />
