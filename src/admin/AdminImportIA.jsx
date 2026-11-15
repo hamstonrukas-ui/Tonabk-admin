@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
 import { reduireImage } from "../lib/image";
+import { lireTailles, sauverTailles, composerDescription, TYPES } from "../lib/descriptionIA";
+import TaillesIA from "./TaillesIA";
 
 const MAX_PHOTOS = 100;      // par série (on peut en faire autant qu'on veut, l'une après l'autre)
 const PARALLELE_IA = 3;      // analyses simultanées
@@ -40,6 +42,8 @@ export default function AdminImportIA() {
   const [devise, setDevise] = useState("USD");
   const [stockMode, setStockMode] = useState("aleatoire");
   const [stockFixe, setStockFixe] = useState("10");
+  const [tailles, setTailles] = useState(lireTailles);
+  const [commentaire, setCommentaire] = useState("");
   const [srcNom, setSrcNom] = useState("");
   const [srcContact, setSrcContact] = useState("");
   const [items, setItems] = useState([]);
@@ -64,6 +68,10 @@ export default function AdminImportIA() {
     return () => { itemsRef.current.forEach((i) => URL.revokeObjectURL(i.apercu)); };
   }, []);
 
+  const changerTailles = (t) => { setTailles(t); sauverTailles(t); };
+  const taillesRef = useRef(tailles);
+  taillesRef.current = tailles;
+
   const maj = (cle, patch) => setItems((prev) => prev.map((i) => (i.cle === cle ? { ...i, ...patch } : i)));
 
   const ajouterPhotos = (e) => {
@@ -77,7 +85,7 @@ export default function AdminImportIA() {
       ...fichiers.slice(0, restants).map((fichier, k) => ({
         cle: `${Date.now()}-${k}-${Math.random().toString(36).slice(2, 7)}`,
         fichier, reduit: null, apercu: URL.createObjectURL(fichier),
-        etat: "attente", ia: null, titre: "", description: "", prix: prixDefaut, sous_categorie_id: null, inclure: false, erreur: "",
+        etat: "attente", ia: null, titre: "", description: "", prix: prixDefaut, sous_categorie_id: null, type: "autre", tailles: "", inclure: false, erreur: "",
       })),
     ]);
   };
@@ -105,6 +113,7 @@ export default function AdminImportIA() {
             maj(item.cle, {
               reduit, etat: "pret", ia: data, titre: data.titre, description: data.description,
               sous_categorie_id: data.sous_categorie_id, inclure: !!data.utilisable,
+              type: data.type_article || "autre", tailles: taillesRef.current[data.type_article] || "",
             });
             return;
           }
@@ -153,7 +162,7 @@ export default function AdminImportIA() {
         body: JSON.stringify({
           boutique_id: boutiqueId, nom: item.titre.trim(), prix: Number(item.prix), devise,
           stock: stockMode === "aleatoire" ? alea() : Math.max(1, Number(stockFixe) || 1),
-          description: item.description.trim(), photo_url: dataUp.url, photo_thumb_url: dataUp.url,
+          description: composerDescription({ description: item.description, type: item.type, tailles: item.tailles, commentaire }), photo_url: dataUp.url, photo_thumb_url: dataUp.url,
           sous_categorie_id: item.sous_categorie_id || undefined,
         }),
       });
@@ -246,6 +255,7 @@ export default function AdminImportIA() {
           </select>
           {stockMode === "fixe" && <input type="number" min="1" value={stockFixe} onChange={(e) => setStockFixe(e.target.value)} style={{ ...champ, width: 80 }} />}
         </div>
+        <TaillesIA tailles={tailles} onTailles={changerTailles} commentaire={commentaire} onCommentaire={setCommentaire} desactive={occupe} />
         <details>
           <summary style={{ fontSize: 12, color: "#B25000", cursor: "pointer" }}>Repère privé : source des photos (optionnel, appliquée à tous)</summary>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
@@ -319,6 +329,13 @@ export default function AdminImportIA() {
                       <>
                         <input value={i.titre} onChange={(e) => maj(i.cle, { titre: e.target.value })} placeholder="Titre" style={{ ...champ, padding: 6 }} maxLength={80} />
                         <textarea value={i.description} onChange={(e) => maj(i.cle, { description: e.target.value })} rows={2} placeholder="Description" style={{ ...champ, padding: 6, resize: "none", fontSize: 12 }} maxLength={500} />
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <select value={i.type} style={{ ...champ, padding: 6, width: 110, fontSize: 12 }}
+                            onChange={(e) => maj(i.cle, { type: e.target.value, tailles: tailles[e.target.value] || "" })}>
+                            {TYPES.map(([k, t]) => <option key={k} value={k}>{t.split(" (")[0]}</option>)}
+                          </select>
+                          <input value={i.tailles} onChange={(e) => maj(i.cle, { tailles: e.target.value })} placeholder="Tailles / pointures" style={{ ...champ, padding: 6, fontSize: 12 }} maxLength={120} />
+                        </div>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <input type="number" min="0" step="any" value={i.prix} onChange={(e) => maj(i.cle, { prix: e.target.value })} placeholder="Prix" style={{ ...champ, padding: 6, width: 90 }} />
                           <span style={{ fontSize: 12 }}>{devise}</span>
