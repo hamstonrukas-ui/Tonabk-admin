@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
 import { reduireImage } from "../lib/image";
+import EnregistreurVoix from "./EnregistreurVoix";
+import { useRole } from "./RoleContext";
 
 const MAX_PHOTOS = 6;
 
@@ -27,12 +29,15 @@ const videForm = {
 };
 
 export default function AdminSoldes() {
+  const complet = useRole() === "admin";
   const [soldes, setSoldes] = useState([]);
   const [erreurListe, setErreurListe] = useState("");
 
   const [form, setForm] = useState(videForm);
   const [photos, setPhotos] = useState([]);
   const [audioFichier, setAudioFichier] = useState(null);
+  const [cleEnr, setCleEnr] = useState(0); // remet à zéro l'enregistreur (création)
+  const [editCleEnr, setEditCleEnr] = useState(0); // idem (modification)
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -147,6 +152,7 @@ export default function AdminSoldes() {
       setForm(videForm);
       setPhotos([]);
       setAudioFichier(null);
+      setCleEnr((c) => c + 1);
       charger();
     } catch (err) {
       setErreur(err.message || "Erreur de connexion");
@@ -164,6 +170,7 @@ export default function AdminSoldes() {
     });
     setEditPhotos([]);
     setEditAudioFichier(null);
+    setEditCleEnr((c) => c + 1);
     setEditAudioExistant(s.audio_url || null);
     setEditPhotosExistantes(s.photos?.length ? s.photos : (s.photo_url ? [s.photo_url] : []));
     setEditErreur("");
@@ -269,15 +276,16 @@ export default function AdminSoldes() {
         )}
 
         <div style={{ border: "1px solid #eee", borderRadius: 8, padding: 10 }}>
-          <p style={{ margin: "0 0 6px", fontSize: 12, color: "#666", fontWeight: 600 }}>🔊 Audio de l'annonce (optionnel, 8 Mo max)</p>
+          <p style={{ margin: "0 0 6px", fontSize: 12, color: "#666", fontWeight: 600 }}>🔊 Audio de l'annonce (optionnel) : choisir un fichier ou enregistrer</p>
           {audioFichier ? (
             <div style={{ fontSize: 12 }}>
               <span style={{ color: "#2E7D32", fontWeight: 600 }}>✓ {audioFichier.name}</span>{" "}
-              <button type="button" onClick={() => setAudioFichier(null)} style={{ color: "red", background: "none", border: "none" }}>Retirer</button>
+              <button type="button" onClick={() => { setAudioFichier(null); setCleEnr((c) => c + 1); }} style={{ color: "red", background: "none", border: "none" }}>Retirer</button>
             </div>
           ) : (
             <input type="file" accept="audio/*" onChange={(e) => { setAudioFichier(e.target.files?.[0] || null); e.target.value = ""; }} />
           )}
+          <EnregistreurVoix key={cleEnr} onPret={setAudioFichier} />
         </div>
 
         <button type="submit" disabled={envoiEnCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}>
@@ -349,7 +357,7 @@ export default function AdminSoldes() {
                 <button style={{ color: "#F5720C" }} onClick={() => (editId === s.id ? setEditId(null) : ouvrirEdition(s))}>
                   {editId === s.id ? "Annuler" : "Modifier"}
                 </button>
-                <button style={{ color: "red" }} onClick={() => supprimerSolde(s.id)}>Supprimer</button>
+                {complet && <button style={{ color: "red" }} onClick={() => supprimerSolde(s.id)}>Supprimer</button>}
               </div>
             </div>
 
@@ -418,11 +426,12 @@ export default function AdminSoldes() {
                   {editAudioFichier ? (
                     <div style={{ fontSize: 12 }}>
                       <span style={{ color: "#2E7D32", fontWeight: 600 }}>✓ {editAudioFichier.name}</span>{" "}
-                      <button type="button" onClick={() => setEditAudioFichier(null)} style={{ color: "red", background: "none", border: "none" }}>Annuler</button>
+                      <button type="button" onClick={() => { setEditAudioFichier(null); setEditCleEnr((c) => c + 1); }} style={{ color: "red", background: "none", border: "none" }}>Annuler</button>
                     </div>
                   ) : (
                     <input type="file" accept="audio/*" onChange={(e) => { setEditAudioFichier(e.target.files?.[0] || null); e.target.value = ""; }} />
                   )}
+                  <EnregistreurVoix key={editCleEnr} onPret={setEditAudioFichier} />
                 </div>
 
                 <button type="submit" disabled={editEnvoiEnCours} style={{ background: "#F5720C", color: "#fff", border: "none", borderRadius: 6, padding: "10px 0", fontWeight: 600 }}>
