@@ -20,7 +20,7 @@ import AdminNouveautes from "./admin/AdminNouveautes";
 import AdminAnalytics from "./admin/AdminAnalytics";
 import AdminReperes from "./admin/AdminReperes";
 import AdminKisakoshi from "./admin/AdminKisakoshi";
-import AdminImportIA from "./admin/AdminImportIA";
+
 import AdminPhotosCassees from "./admin/AdminPhotosCassees";
 import AdminMesMissions from "./admin/AdminMesMissions";
 import AdminLogin from "./admin/AdminLogin";
