@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AdminLayout from "./admin/AdminLayout";
 import AdminDashboard from "./admin/AdminDashboard";
@@ -20,7 +19,8 @@ import AdminNouveautes from "./admin/AdminNouveautes";
 import AdminAnalytics from "./admin/AdminAnalytics";
 import AdminReperes from "./admin/AdminReperes";
 import AdminKisakoshi from "./admin/AdminKisakoshi";
-
+import AdminImportIA from "./admin/AdminImportIA";
+import AdminAmeliorerIA from "./admin/AdminAmeliorerIA";
 import AdminPhotosCassees from "./admin/AdminPhotosCassees";
 import AdminMesMissions from "./admin/AdminMesMissions";
 import AdminLogin from "./admin/AdminLogin";
@@ -59,6 +59,7 @@ export default function App() {
           <Route path="reperes" element={<AdminReperes />} />
           <Route path="photos-cassees" element={<SeulementAdmin><AdminPhotosCassees /></SeulementAdmin>} />
           <Route path="import-ia" element={<SeulementAdmin><AdminImportIA /></SeulementAdmin>} />
+          <Route path="ameliorer-ia" element={<SeulementAdmin><AdminAmeliorerIA /></SeulementAdmin>} />
           <Route path="kisakoshi" element={<SeulementAdmin><AdminKisakoshi /></SeulementAdmin>} />
           <Route path="statistiques" element={<SeulementAdmin><AdminAnalytics /></SeulementAdmin>} />
           <Route path="mes-missions" element={<AdminMesMissions />} />
