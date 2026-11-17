@@ -1,72 +1,56 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AdminLayout from "./admin/AdminLayout";
-import AdminDashboard from "./admin/AdminDashboard";
-import AdminBoutiques from "./admin/AdminBoutiques";
-import AdminToutesBoutiques from "./admin/AdminToutesBoutiques";
-import AdminGererProduits from "./admin/AdminGererProduits";
-import AdminRequetes from "./admin/AdminRequetes";
-import AdminMaisons from "./admin/AdminMaisons";
-import AdminParrainages from "./admin/AdminParrainages";
-import AdminPersonnel from "./admin/AdminPersonnel";
-import AdminSuiviPersonnel from "./admin/AdminSuiviPersonnel";
-import AdminSoldes from "./admin/AdminSoldes";
-import AdminPresence from "./admin/AdminPresence";
-import AdminRecuperationBoutique from "./admin/AdminRecuperationBoutique";
-import AdminClassement from "./admin/AdminClassement";
-import AdminLivraisons from "./admin/AdminLivraisons";
-import AdminMissions from "./admin/AdminMissions";
-import AdminNouveautes from "./admin/AdminNouveautes";
-import AdminAnalytics from "./admin/AdminAnalytics";
-import AdminReperes from "./admin/AdminReperes";
-import AdminKisakoshi from "./admin/AdminKisakoshi";
-import AdminImportIA from "./admin/AdminImportIA";
-import AdminAmeliorerIA from "./admin/AdminAmeliorerIA";
-import AdminPhotosCassees from "./admin/AdminPhotosCassees";
-import AdminMesMissions from "./admin/AdminMesMissions";
-import AdminLogin from "./admin/AdminLogin";
-import DefinirMotDePasse from "./admin/DefinirMotDePasse";
-import RequireAdmin from "./admin/RequireAdmin";
-import { SeulementAdmin } from "./admin/RoleContext";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useRole } from "./RoleContext";
+import { supabase } from "../lib/supabaseClient";
 
-export default function App() {
+export default function AdminLayout() {
+  const complet = useRole() === "admin";
+  const navigate = useNavigate();
+
+  const deconnexion = async () => {
+    await supabase.auth.signOut();
+    navigate("/connexion");
+  };
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/connexion" element={<AdminLogin />} />
-        <Route path="/definir-mot-de-passe/:token" element={<DefinirMotDePasse />} />
-        <Route
-          path="/"
-          element={
-            <RequireAdmin>
-              <AdminLayout />
-            </RequireAdmin>
-          }
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      <aside style={{ width: 220, background: "#1B1B1B", color: "#fff", padding: 16, display: "flex", flexDirection: "column" }}>
+        <h2 style={{ color: "#F5720C", marginBottom: complet ? 20 : 4 }}>TonaBk Admin</h2>
+        {!complet && <p style={{ fontSize: 11, color: "#aaa", marginBottom: 16 }}>Espace employé</p>}
+        <nav style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+          {complet && <NavLink to="/" end>Vue d'ensemble</NavLink>}
+          {complet && <NavLink to="/statistiques">Statistiques</NavLink>}
+          {complet && <NavLink to="/boutiques">Boutiques à valider</NavLink>}
+          <NavLink to="/toutes-boutiques">{complet ? "Toutes les boutiques" : "Boutiques"}</NavLink>
+          {complet && <NavLink to="/import-ia">Import IA</NavLink>}
+          {complet && <NavLink to="/ameliorer-ia">Améliorer avec l'IA</NavLink>}
+          {complet && <NavLink to="/photos-cassees">Photos cassées</NavLink>}
+          {complet && <NavLink to="/classement">Classer les articles</NavLink>}
+          <NavLink to="/reperes">Repères</NavLink>
+          {complet && <NavLink to="/requetes">Requêtes</NavLink>}
+          {complet && <NavLink to="/maisons">Maisons</NavLink>}
+          {complet && <NavLink to="/parrainages">Parrainages</NavLink>}
+          {complet && <NavLink to="/personnel">Personnel</NavLink>}
+          {complet && <NavLink to="/missions">Missions</NavLink>}
+          {!complet && <NavLink to="/mes-missions">Mes missions</NavLink>}
+          <NavLink to="/soldes">Soldes</NavLink>
+          <NavLink to="/nouveautes">Mali mupya</NavLink>
+          <NavLink to="/liens">Liens à partager</NavLink>
+          <NavLink to="/guide-vocal">Guide vocal</NavLink>
+          {complet && <NavLink to="/kisakoshi">Kisakoshi</NavLink>}
+          {complet && <NavLink to="/recuperation">Récupération</NavLink>}
+          <NavLink to="/livraisons">{complet ? "Livraisons" : "Mes livraisons"}</NavLink>
+          <NavLink to="/presence">{complet ? "Présence" : "Présence et historique"}</NavLink>
+        </nav>
+        <button
+          onClick={deconnexion}
+          style={{ background: "none", border: "1px solid #444", color: "#ccc", borderRadius: 6, padding: "10px 0", marginTop: 16, cursor: "pointer" }}
         >
-          <Route index element={<SeulementAdmin><AdminDashboard /></SeulementAdmin>} />
-          <Route path="boutiques" element={<SeulementAdmin><AdminBoutiques /></SeulementAdmin>} />
-          <Route path="toutes-boutiques" element={<AdminToutesBoutiques />} />
-          <Route path="boutiques/:id/produits" element={<AdminGererProduits />} />
-          <Route path="classement" element={<SeulementAdmin><AdminClassement /></SeulementAdmin>} />
-          <Route path="requetes" element={<SeulementAdmin><AdminRequetes /></SeulementAdmin>} />
-          <Route path="maisons" element={<SeulementAdmin><AdminMaisons /></SeulementAdmin>} />
-          <Route path="parrainages" element={<SeulementAdmin><AdminParrainages /></SeulementAdmin>} />
-          <Route path="personnel" element={<SeulementAdmin><AdminPersonnel /></SeulementAdmin>} />
-          <Route path="personnel/:id" element={<SeulementAdmin><AdminSuiviPersonnel /></SeulementAdmin>} />
-          <Route path="soldes" element={<AdminSoldes />} />
-          <Route path="presence" element={<AdminPresence />} />
-          <Route path="missions" element={<SeulementAdmin><AdminMissions /></SeulementAdmin>} />
-          <Route path="nouveautes" element={<AdminNouveautes />} />
-          <Route path="reperes" element={<AdminReperes />} />
-          <Route path="photos-cassees" element={<SeulementAdmin><AdminPhotosCassees /></SeulementAdmin>} />
-          <Route path="import-ia" element={<SeulementAdmin><AdminImportIA /></SeulementAdmin>} />
-          <Route path="ameliorer-ia" element={<SeulementAdmin><AdminAmeliorerIA /></SeulementAdmin>} />
-          <Route path="kisakoshi" element={<SeulementAdmin><AdminKisakoshi /></SeulementAdmin>} />
-          <Route path="statistiques" element={<SeulementAdmin><AdminAnalytics /></SeulementAdmin>} />
-          <Route path="mes-missions" element={<AdminMesMissions />} />
-          <Route path="livraisons" element={<AdminLivraisons />} />
-          <Route path="recuperation" element={<SeulementAdmin><AdminRecuperationBoutique /></SeulementAdmin>} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          Déconnexion
+        </button>
+      </aside>
+      <main style={{ flex: 1, padding: 24, background: "#F3F3F3" }}>
+        <Outlet />
+      </main>
+    </div>
   );
 }
