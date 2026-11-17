@@ -55,7 +55,7 @@ export default function App() {
           <Route path="soldes" element={<AdminSoldes />} />
           <Route path="presence" element={<AdminPresence />} />
           <Route path="missions" element={<SeulementAdmin><AdminMissions /></SeulementAdmin>} />
-          <Route path="nouveautes" element={<SeulementAdmin><AdminNouveautes /></SeulementAdmin>} />
+          <Route path="nouveautes" element={<AdminNouveautes />} />
           <Route path="reperes" element={<AdminReperes />} />
           <Route path="photos-cassees" element={<SeulementAdmin><AdminPhotosCassees /></SeulementAdmin>} />
           <Route path="import-ia" element={<SeulementAdmin><AdminImportIA /></SeulementAdmin>} />
