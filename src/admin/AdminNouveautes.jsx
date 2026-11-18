@@ -26,6 +26,8 @@ export default function AdminNouveautes() {
   const [liste, setListe] = useState([]);
   const [photos, setPhotos] = useState([]); // [{ fichier, apercu }] — 5 maximum
   const [texte, setTexte] = useState("");
+  const [boutiques, setBoutiques] = useState([]);
+  const [boutiqueId, setBoutiqueId] = useState(""); // vide = publié au nom de TonaBk
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
   const [message, setMessage] = useState("");
@@ -41,6 +43,14 @@ export default function AdminNouveautes() {
   }, []);
 
   useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/boutiques/admin/toutes`, { headers: await enTetes(false) });
+        if (res.ok) setBoutiques((await res.json()).filter((b) => b.statut === "actif"));
+      } catch { /* la liste restera vide : on publie alors au nom de TonaBk */ }
+    })();
+  }, []);
   const apercusRef = useRef([]);
   apercusRef.current = photos.map((p) => p.apercu);
   useEffect(() => () => { apercusRef.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
@@ -76,12 +86,12 @@ export default function AdminNouveautes() {
       }
 
       const res = await fetch(`${API_URL}/api/nouveautes`, {
-        method: "POST", headers: await enTetes(), body: JSON.stringify({ photos: urls, texte }),
+        method: "POST", headers: await enTetes(), body: JSON.stringify({ photos: urls, texte, ...(boutiqueId ? { boutique_id: boutiqueId } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Échec de la publication");
 
-      setMessage("Nouveauté publiée pour 48 h.");
+      setMessage(`Nouveauté publiée pour 48 h${boutiqueId ? " au nom de la boutique choisie" : ""}.`);
       photos.forEach((p) => URL.revokeObjectURL(p.apercu)); setPhotos([]); setTexte("");
       charger();
     } catch (err) {
@@ -100,10 +110,14 @@ export default function AdminNouveautes() {
   return (
     <div style={{ maxWidth: 560 }}>
       <h1>Mali mupya</h1>
-      <p style={{ fontSize: 13, color: "#666" }}>Statuts visibles 48 h dans le menu de l'application. Les commerçants peuvent aussi en publier ; vous pouvez supprimer n'importe laquelle.</p>
+      <p style={{ fontSize: 13, color: "#666" }}>Statuts visibles 48 h dans le menu de l'application. Choisissez la boutique à laquelle la nouveauté appartient (son nom et son WhatsApp s'afficheront), ou publiez au nom de TonaBk. Les commerçants peuvent aussi en publier ; vous pouvez supprimer n'importe laquelle.</p>
 
       <form onSubmit={publier} style={{ background: "#fff", borderRadius: 12, padding: 16, marginBottom: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-        <h3 style={{ margin: 0 }}>Publier au nom de TonaBk</h3>
+        <h3 style={{ margin: 0 }}>Publier une nouveauté</h3>
+        <select value={boutiqueId} onChange={(e) => setBoutiqueId(e.target.value)} style={{ border: "1px solid #ddd", borderRadius: 6, padding: 10, fontSize: 14 }}>
+          <option value="">Au nom de TonaBk (sans boutique)</option>
+          {boutiques.map((b) => <option key={b.id} value={b.id}>{b.nom}{b.ville ? ` (${b.ville})` : ""}</option>)}
+        </select>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
           {photos.map((p, idx) => (
             <div key={p.apercu} style={{ position: "relative", aspectRatio: "1 / 1" }}>
