@@ -17,6 +17,7 @@ import AdminLivraisons from "./admin/AdminLivraisons";
 import AdminMissions from "./admin/AdminMissions";
 import AdminNouveautes from "./admin/AdminNouveautes";
 import AdminLiens from "./admin/AdminLiens";
+import AdminColis from "./admin/AdminColis";
 import AdminGuideVocal from "./admin/AdminGuideVocal";
 import AdminAnalytics from "./admin/AdminAnalytics";
 import AdminReperes from "./admin/AdminReperes";
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="missions" element={<SeulementAdmin><AdminMissions /></SeulementAdmin>} />
           <Route path="nouveautes" element={<AdminNouveautes />} />
           <Route path="liens" element={<AdminLiens />} />
+          <Route path="colis" element={<SeulementAdmin><AdminColis /></SeulementAdmin>} />
           <Route path="guide-vocal" element={<AdminGuideVocal />} />
           <Route path="reperes" element={<AdminReperes />} />
           <Route path="photos-cassees" element={<SeulementAdmin><AdminPhotosCassees /></SeulementAdmin>} />
