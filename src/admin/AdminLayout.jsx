@@ -34,6 +34,7 @@ export default function AdminLayout() {
           {!complet && <NavLink to="/mes-missions">Mes missions</NavLink>}
           <NavLink to="/soldes">Soldes</NavLink>
           <NavLink to="/nouveautes">Mali mupya</NavLink>
+          {complet && <NavLink to="/colis">Colis à expédier</NavLink>}
           <NavLink to="/liens">Liens à partager</NavLink>
           <NavLink to="/guide-vocal">Guide vocal</NavLink>
           {complet && <NavLink to="/kisakoshi">Kisakoshi</NavLink>}
