@@ -22,6 +22,7 @@ const AIDES_PAGES = [
   { n: "requete", icone: "🔎", titre: "Requêtes", texte: "Vous cherchez un produit introuvable ? Décrivez-le ici : des vendeurs pourront vous répondre." },
   { n: "location", icone: "🏠", titre: "Location de maisons", texte: "Trouvez une maison à louer par quartier. Touchez une maison pour voir les photos et contacter le propriétaire." },
   { n: "commandes", icone: "🚚", titre: "Commandes", texte: "Vous retrouvez ici vos demandes de livraison. Touchez-en une pour reprendre la conversation sur WhatsApp." },
+  { n: "expeditions", icone: "📦", titre: "Expédition de colis", texte: "Choisissez votre trajet pour voir sur la carte le chemin que suit votre colis, puis lisez les informations. Touchez le bouton vert pour nous écrire sur WhatsApp et expédier." },
   { n: "panier", icone: "🧺", titre: "Panier", texte: "Vérifiez vos articles puis envoyez votre commande." },
 ];
 
