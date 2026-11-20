@@ -105,6 +105,9 @@ export default function AdminSuiviPersonnel() {
                       {heure(j.heure_debut)} → {j.heure_fin ? heure(j.heure_fin) : "—"}
                       {j.heure_fin && <> · <strong>{duree(j.heure_debut, j.heure_fin)}</strong></>}
                     </div>
+                    {!j.activites && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#D32F2F", marginTop: 3 }}>Rapport manquant</div>
+                    )}
                     {!ouv && j.activites && (
                       <div style={{ fontSize: 12, color: "#999", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {j.activites}
@@ -114,20 +117,20 @@ export default function AdminSuiviPersonnel() {
 
                   {ouv && (
                     <div style={{ background: "#FAFAFA", padding: "4px 14px 14px", fontSize: 13 }}>
-                      <p style={{ margin: "8px 0 2px", fontWeight: 700, fontSize: 12, color: "#F5720C" }}>ACTIVITÉS RÉALISÉES</p>
-                      <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{j.activites || <em style={{ color: "#999" }}>Aucun rapport (journée non clôturée)</em>}</p>
+                      <p style={{ margin: "8px 0 2px", fontWeight: 700, fontSize: 12, color: "#F5720C" }}>ACTIVITÉS RÉALISÉES{j.rapport_le ? <span style={{ fontWeight: 400, color: "#999" }}> · rapport envoyé à {heure(j.rapport_le)}</span> : null}</p>
+                      <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{j.activites || <em style={{ color: "#D32F2F" }}>Aucun rapport envoyé</em>}</p>
 
                       <p style={{ margin: "12px 0 2px", fontWeight: 700, fontSize: 12, color: "#F5720C" }}>DIFFICULTÉS RENCONTRÉES</p>
                       <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{j.difficultes || <em style={{ color: "#999" }}>Aucune signalée</em>}</p>
 
                       <p style={{ margin: "12px 0 2px", fontWeight: 700, fontSize: 12, color: "#F5720C" }}>LIEU</p>
                       <p style={{ margin: 0 }}>
-                        🟢 Début : {j.adresse_debut || "adresse non trouvée"}{" "}
+                        🟢 Début : {j.adresse_debut || "adresse non trouvée"}{j.source_debut === "whatsapp" ? " (position via WhatsApp)" : ""}{" "}
                         <a href={lienCarte(j.lat_debut, j.lng_debut)} target="_blank" rel="noopener noreferrer" style={{ color: "#F5720C" }}>carte</a>
                       </p>
                       {j.heure_fin && (
                         <p style={{ margin: "4px 0 0" }}>
-                          🔴 Fin : {j.lat_fin != null ? (j.adresse_fin || "adresse non trouvée") : "position non partagée"}{" "}
+                          🔴 Fin : {j.lat_fin != null ? (j.adresse_fin || "adresse non trouvée") : "position non partagée"}{j.source_fin === "whatsapp" ? " (position via WhatsApp)" : ""}{" "}
                           {j.lat_fin != null && (
                             <a href={lienCarte(j.lat_fin, j.lng_fin)} target="_blank" rel="noopener noreferrer" style={{ color: "#F5720C" }}>carte</a>
                           )}
