@@ -110,7 +110,7 @@ export default function AdminTableauPersonnel() {
     } catch (e) { setErreur(e.message); }
   };
   const copier = async (code) => {
-    const lien = `tonabk.com/${code}`;
+    const lien = `https://www.tonabk.com/${code}`;
     try { await navigator.clipboard.writeText(lien); } catch { window.prompt("Copiez l'adresse :", lien); }
   };
 
@@ -266,7 +266,7 @@ export default function AdminTableauPersonnel() {
                     <tr key={l.id}>
                       <td style={{ ...td, fontWeight: 600 }}>{l.nom}</td>
                       <td style={td}>
-                        {z.code ? <><b style={{ color: ORANGE }}>tonabk.com/{z.code}</b>{" "}
+                        {z.code ? <><a href={`https://www.tonabk.com/${z.code}`} target="_blank" rel="noreferrer" style={{ color: ORANGE, fontWeight: 700 }}>tonabk.com/{z.code}</a>{" "}
                           <button onClick={() => copier(z.code)} style={{ border: "1px solid #ddd", background: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 12 }}>Copier</button></> : <span style={{ color: "#999" }}>—</span>}
                         {z.code && <>{" "}<button onClick={() => voirAppareils(l)} style={{ border: "1px solid #ddd", background: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 12 }}>Téléphones</button></>}
                         {complet && <>{" "}<button onClick={() => creerAdresse(l)} style={{ border: `1px solid ${ORANGE}`, background: "#fff", color: ORANGE, borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 12 }}>{z.code ? "Changer" : "Créer l'adresse"}</button></>}
