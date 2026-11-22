@@ -1,7 +1,7 @@
 // Tableau du personnel (admin principal) :
 //  1. Gestion de l'application : chiffres automatiques
 //  2. Gestion des clients : saisie manuelle, semaine par semaine (cumul dans le mois)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
 import { useRole } from "./RoleContext";
@@ -35,8 +35,36 @@ const libelleSemaine = (lundi) => {
   const f = (x) => x.toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
   return `${f(a)} → ${f(b)}`;
 };
+const decalerSemaine = (lundi, n) => { const d = new Date(`${lundi}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 7 * n); return d.toISOString().slice(0, 10); };
+const MESSAGE_PAIE = (
+  <div style={{ background: "#FFF6EE", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.5, color: "#444" }}>
+    <div><b style={{ color: "#c0392b" }}>⚠ Les manques peuvent affecter votre salaire mensuel et le diminuer.</b></div>
+    <div><b style={{ color: "#1e8e3e" }}>★ Les excédents sont encouragés par des primes.</b></div>
+  </div>
+);
 const libelleMois = (mois) => new Date(`${mois}-01T12:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
+
+// Nombre qui monte progressivement jusqu'à sa valeur (effet « compteur »)
+function Compteur({ valeur, duree = 1200 }) {
+  const [v, setV] = useState(0);
+  const depart = useRef(0);
+  useEffect(() => {
+    const de = depart.current, a = Number(valeur) || 0, t0 = performance.now();
+    let raf;
+    const pas = (t) => {
+      const k = Math.min((t - t0) / duree, 1);
+      const val = de + (a - de) * (1 - Math.pow(1 - k, 3));
+      setV(val); depart.current = val;
+      if (k < 1) raf = requestAnimationFrame(pas);
+    };
+    raf = requestAnimationFrame(pas);
+    return () => cancelAnimationFrame(raf);
+  }, [valeur]);
+  return <>{Math.round(v).toLocaleString("fr-FR")}</>;
+}
+const NOMS_MISSIONS = { app: "Gestion de l'application", sensi: "Sensibilisation terrain", clients: "Gestion des clients" };
+const POIDS_MISSIONS = { app: 10, sensi: 25, clients: 45 };
 
 async function entetes() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -50,6 +78,10 @@ export default function AdminTableauPersonnel() {
   const [erreur, setErreur] = useState("");
   const [edition, setEdition] = useState(null); // { id, valeurs }
   const [enregistrement, setEnregistrement] = useState(false);
+  const [moi, setMoi] = useState(null);
+  const [lundiRes, setLundiRes] = useState(lundiDe()); // semaine du résumé
+  const [resume, setResume] = useState(null);
+  const [ouvert, setOuvert] = useState(null); // carte de rémunération dépliée
   const [detail, setDetail] = useState(null); // { id, nom, code, appareils }
 
   const charger = async (m = mois) => {
@@ -58,10 +90,23 @@ export default function AdminTableauPersonnel() {
       const r = await fetch(`${API_URL}/api/tableau-personnel?mois=${m}`, { headers: await entetes() });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Erreur");
-      setLignes(d.personnel);
+      setLignes(d.personnel); setMoi(d.moi);
     } catch (e) { setErreur(e.message || "Chargement impossible"); }
   };
   useEffect(() => { charger(mois); }, [mois]);
+  useEffect(() => {
+    let annule = false;
+    setResume(null);
+    (async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/tableau-personnel/resume-semaine?semaine=${lundiRes}`, { headers: await entetes() });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Erreur");
+        if (!annule) setResume(d);
+      } catch (e) { if (!annule) setErreur(e.message); }
+    })();
+    return () => { annule = true; };
+  }, [lundiRes]);
 
   // Saisie d'une semaine : { id, semaine, valeurs }
   const demarrer = (l, semaine = lundiDe(), source = null) => setEdition({
@@ -89,6 +134,28 @@ export default function AdminTableauPersonnel() {
     } catch (e) { setErreur(e.message); }
   };
 
+  const declarer = async (l) => {
+    const saisie = window.prompt(`Combien de personnes ${l.id === moi ? "avez-vous" : `${l.nom} a-t-il/elle`} sensibilisées aujourd'hui ? (redonner un nombre le même jour le corrige)`, "");
+    if (saisie === null || saisie.trim() === "") return;
+    setErreur("");
+    try {
+      const r = await fetch(`${API_URL}/api/tableau-personnel/declaration`, { method: "POST", headers: await entetes(), body: JSON.stringify({ personnes: saisie, personnelId: l.id }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Enregistrement impossible");
+      await charger(mois);
+    } catch (e) { setErreur(e.message); }
+  };
+  const niveauRenseignement = async (l) => {
+    const saisie = window.prompt(`Service renseignement & livraison de ${l.nom} — niveau du mois (0 à 100 %)`, String(l.remuneration.renseignement.niveau));
+    if (saisie === null || saisie.trim() === "") return;
+    setErreur("");
+    try {
+      const r = await fetch(`${API_URL}/api/tableau-personnel/renseignement/${l.id}`, { method: "PUT", headers: await entetes(), body: JSON.stringify({ mois, niveau: saisie }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Enregistrement impossible");
+      await charger(mois);
+    } catch (e) { setErreur(e.message); }
+  };
   const creerAdresse = async (l) => {
     const saisie = window.prompt(`Adresse de ${l.nom} (3 à 20 lettres/chiffres, sans espace). Ex : ${(l.nom || "agent").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) || "agent"}`, l.sensibilisation.code || "");
     if (!saisie) return;
@@ -255,7 +322,7 @@ export default function AdminTableauPersonnel() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr>
                 <th style={th}>Personnel</th><th style={th}>Adresse à donner</th>
-                <th style={{ ...th, textAlign: "center" }}>Téléphones différents</th><th style={{ ...th, textAlign: "center" }}>Apps installées</th>
+                <th style={{ ...th, textAlign: "center" }}>Personnes sensibilisées</th><th style={{ ...th, textAlign: "center" }}>Téléphones différents</th><th style={{ ...th, textAlign: "center" }}>Apps installées</th>
                 <th style={{ ...th, textAlign: "center" }}>Contacts WhatsApp</th><th style={{ ...th, textAlign: "center" }}>Livre-moi</th>
                 <th style={{ ...th, textAlign: "center" }}>Colis déposés</th>
               </tr></thead>
@@ -271,6 +338,7 @@ export default function AdminTableauPersonnel() {
                         {z.code && <>{" "}<button onClick={() => voirAppareils(l)} style={{ border: "1px solid #ddd", background: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 12 }}>Téléphones</button></>}
                         {complet && <>{" "}<button onClick={() => creerAdresse(l)} style={{ border: `1px solid ${ORANGE}`, background: "#fff", color: ORANGE, borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 12 }}>{z.code ? "Changer" : "Créer l'adresse"}</button></>}
                       </td>
+                      <td style={nombre}>{fmt(z.declarees)}{(complet || l.id === moi) && <div><button onClick={() => declarer(l)} style={{ marginTop: 3, background: ORANGE, color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>+ Déclarer</button></div>}</td>
                       <td style={nombre}>{fmt(z.visiteurs)}</td><td style={nombre}>{fmt(z.installations)}</td>
                       <td style={nombre}>{fmt(z.whatsapp)}</td><td style={nombre}>{fmt(z.livraisons)}</td><td style={nombre}>{fmt(z.colis)}</td>
                     </tr>
@@ -278,7 +346,7 @@ export default function AdminTableauPersonnel() {
                 })}
                 <tr style={{ background: "#FFF6EE" }}>
                   <td style={{ ...td, fontWeight: 800 }}>Total</td><td style={td}></td>
-                  {["visiteurs", "installations", "whatsapp", "livraisons", "colis"].map((k) => (
+                  {["declarees", "visiteurs", "installations", "whatsapp", "livraisons", "colis"].map((k) => (
                     <td key={k} style={{ ...nombre, color: ORANGE }}>{fmt(somme((l) => l.sensibilisation[k]))}</td>
                   ))}
                 </tr>
@@ -309,6 +377,97 @@ export default function AdminTableauPersonnel() {
               <p style={{ fontSize: 11, color: "#888", margin: "8px 0 0" }}>Un même téléphone n'est compté qu'une seule fois, même s'il ouvre l'adresse plusieurs fois.</p>
             </div>
           )}
+          <h2 style={{ fontSize: 16, margin: "0 0 2px" }}>4. Compteur de rémunération</h2>
+          <p style={{ fontSize: 12, color: "#888", margin: "0 0 8px" }}>
+            Les points montent à mesure que les tâches sont faites (cible atteinte = 100 % de la mission). Le service renseignement & livraison est compté à part.
+          </p>
+          <div style={{ marginBottom: 10 }}>{MESSAGE_PAIE}</div>
+          {[...lignes].sort((a, b) => (a.id === moi ? -1 : b.id === moi ? 1 : 0)).map((l) => {
+            const r = l.remuneration;
+            const mien = l.id === moi;
+            return (
+              <div key={l.id} style={{ background: "#fff", borderRadius: 10, padding: 14, marginBottom: 12, border: mien ? `2px solid ${ORANGE}` : "1px solid #eee" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+                  <strong>{l.nom}{mien ? " (moi)" : ""}</strong>
+                  <span style={{ fontSize: 12, color: "#888" }}>maximum {fmt(r.max)} points</span>
+                </div>
+                <div style={{ fontSize: 34, fontWeight: 800, color: ORANGE, lineHeight: 1.2 }}><Compteur valeur={r.total} /> <span style={{ fontSize: 14, color: "#888", fontWeight: 600 }}>points · {r.pct} %</span></div>
+                <div style={{ height: 8, background: "#f1f1f1", borderRadius: 4, margin: "6px 0 10px", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(r.pct, 100)}%`, height: "100%", background: ORANGE, transition: "width 1.2s" }} />
+                </div>
+                {Object.entries(r.missions).map(([m, x]) => (
+                  <div key={m} style={{ marginBottom: 8 }}>
+                    <div onClick={() => setOuvert(ouvert === `${l.id}${m}` ? null : `${l.id}${m}`)} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, cursor: "pointer", gap: 8 }}>
+                      <span>{ouvert === `${l.id}${m}` ? "▾" : "▸"} {NOMS_MISSIONS[m]} <span style={{ color: "#999" }}>({POIDS_MISSIONS[m]} %)</span></span>
+                      <b>{fmt(x.points)} / {fmt(x.max)} pts{x.pct < 100 ? <span style={{ color: "#c0392b", fontWeight: 600 }}> · manque {Math.round((100 - x.pct) * 10) / 10} %</span> : <span style={{ color: "#1e8e3e", fontWeight: 600 }}> · complet</span>}{x.surplus > 0 && <span style={{ color: "#1e8e3e", fontWeight: 600 }}> · surplus +{x.surplus} %</span>}</b>
+                    </div>
+                    <div style={{ height: 5, background: "#f1f1f1", borderRadius: 3, marginTop: 3, overflow: "hidden" }}><div style={{ width: `${Math.min(x.pct, 100)}%`, height: "100%", background: "#1e8e3e" }} /></div>
+                    {ouvert === `${l.id}${m}` && (
+                      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 6 }}>
+                        <tbody>
+                          {x.details.map((d) => (
+                            <tr key={d.libelle}>
+                              <td style={{ ...td, whiteSpace: "normal", padding: "4px 6px" }}>{d.libelle} <span style={{ color: "#aaa" }}>({d.poids} %)</span></td>
+                              <td style={{ ...td, padding: "4px 6px", textAlign: "right" }}>{fmt(d.fait)} / {fmt(d.cible)}{d.haut ? ` à ${fmt(d.haut)}` : ""}</td>
+                              <td style={{ ...td, padding: "4px 6px", textAlign: "right", fontWeight: 700, color: d.ecart < 0 ? "#c0392b" : "#1e8e3e" }}>{d.ecart < 0 ? `manque ${fmt(-d.ecart)}` : d.ecart > 0 ? `surplus +${fmt(d.ecart)}` : "atteint"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ))}
+                <div style={{ borderTop: "1px dashed #ddd", paddingTop: 8, marginTop: 4, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                  <span>Service renseignement &amp; livraison <span style={{ color: "#999" }}>(à côté, occasionnel)</span> : niveau {r.renseignement.niveau} %</span>
+                  <span><b>+ {fmt(r.renseignement.points)} pts</b> <span style={{ color: "#999" }}>/ {fmt(r.renseignement.max)}</span>
+                    {complet && <button onClick={() => niveauRenseignement(l)} style={{ marginLeft: 8, background: "#fff", border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 12 }}>Saisir</button>}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          <h2 style={{ fontSize: 16, margin: "28px 0 2px" }}>5. Résumé de la semaine</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0 10px" }}>
+            <button onClick={() => setLundiRes(decalerSemaine(lundiRes, -1))} style={{ border: `1px solid ${ORANGE}`, background: "#fff", color: ORANGE, borderRadius: 6, padding: "6px 12px", cursor: "pointer" }}>‹</button>
+            <strong style={{ minWidth: 170, textAlign: "center", fontSize: 14 }}>{libelleSemaine(lundiRes)}{lundiRes === lundiDe() ? " (en cours)" : ""}</strong>
+            <button onClick={() => setLundiRes(decalerSemaine(lundiRes, 1))} disabled={lundiRes >= lundiDe()} style={{ border: `1px solid ${ORANGE}`, background: "#fff", color: ORANGE, borderRadius: 6, padding: "6px 12px", cursor: "pointer", opacity: lundiRes >= lundiDe() ? 0.4 : 1 }}>›</button>
+          </div>
+          {!resume && <p style={{ fontSize: 13, color: "#888" }}>Chargement…</p>}
+          {resume && [...resume.personnel].sort((a, b) => (a.id === resume.moi ? -1 : b.id === resume.moi ? 1 : 0)).map((l) => {
+            const r = l.remuneration;
+            const mien = l.id === resume.moi;
+            const manques = Object.values(r.missions).flatMap((x) => x.details.filter((d) => d.ecart < 0)).length;
+            const excedents = Object.values(r.missions).flatMap((x) => x.details.filter((d) => d.ecart > 0)).length;
+            return (
+              <div key={l.id} style={{ background: "#fff", borderRadius: 10, padding: 14, marginBottom: 12, border: mien ? `2px solid ${ORANGE}` : "1px solid #eee" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                  <strong>{l.nom}{mien ? " (moi)" : ""}</strong>
+                  <b style={{ color: ORANGE }}>{fmt(r.total)} / {fmt(r.max)} points · {r.pct} %</b>
+                </div>
+                <div style={{ fontSize: 12, margin: "4px 0 8px" }}>
+                  <span style={{ color: manques ? "#c0392b" : "#1e8e3e", fontWeight: 700 }}>{manques ? `${manques} point(s) en manque` : "Aucun manque"}</span>
+                  {" · "}<span style={{ color: excedents ? "#1e8e3e" : "#888", fontWeight: 700 }}>{excedents ? `${excedents} excédent(s)` : "aucun excédent"}</span>
+                </div>
+                {Object.entries(r.missions).map(([m, x]) => (
+                  <div key={m} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: x.pct < 100 ? "#c0392b" : "#1e8e3e" }}>{NOMS_MISSIONS[m]} — {x.pct} %{x.surplus > 0 ? ` (excédent +${x.surplus} %)` : ""}</div>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <tbody>
+                        {x.details.map((d) => (
+                          <tr key={d.libelle} style={{ background: d.ecart < 0 ? "#FFF1F0" : d.ecart > 0 ? "#EEF8F0" : undefined }}>
+                            <td style={{ ...td, whiteSpace: "normal", padding: "4px 6px" }}>{d.libelle}</td>
+                            <td style={{ ...td, padding: "4px 6px", textAlign: "right" }}>{fmt(d.fait)} / {fmt(d.cible)}</td>
+                            <td style={{ ...td, padding: "4px 6px", textAlign: "right", fontWeight: 700, color: d.ecart < 0 ? "#c0392b" : "#1e8e3e" }}>{d.ecart < 0 ? `manque ${fmt(-d.ecart)}` : d.ecart > 0 ? `excédent +${fmt(d.ecart)}` : "atteint ✓"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {resume && MESSAGE_PAIE}
         </>
       )}
     </div>
