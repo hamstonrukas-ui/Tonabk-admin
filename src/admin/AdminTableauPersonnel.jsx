@@ -35,7 +35,6 @@ const libelleSemaine = (lundi) => {
   const f = (x) => x.toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
   return `${f(a)} → ${f(b)}`;
 };
-const decalerSemaine = (lundi, n) => { const d = new Date(`${lundi}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 7 * n); return d.toISOString().slice(0, 10); };
 const MESSAGE_PAIE = (
   <div style={{ background: "#FFF6EE", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.5, color: "#444" }}>
     <div><b style={{ color: "#c0392b" }}>⚠ Les manques peuvent affecter votre salaire mensuel et le diminuer.</b></div>
@@ -79,8 +78,6 @@ export default function AdminTableauPersonnel() {
   const [edition, setEdition] = useState(null); // { id, valeurs }
   const [enregistrement, setEnregistrement] = useState(false);
   const [moi, setMoi] = useState(null);
-  const [lundiRes, setLundiRes] = useState(lundiDe()); // semaine du résumé
-  const [resume, setResume] = useState(null);
   const [ouvert, setOuvert] = useState(null); // carte de rémunération dépliée
   const [detail, setDetail] = useState(null); // { id, nom, code, appareils }
 
@@ -94,19 +91,6 @@ export default function AdminTableauPersonnel() {
     } catch (e) { setErreur(e.message || "Chargement impossible"); }
   };
   useEffect(() => { charger(mois); }, [mois]);
-  useEffect(() => {
-    let annule = false;
-    setResume(null);
-    (async () => {
-      try {
-        const r = await fetch(`${API_URL}/api/tableau-personnel/resume-semaine?semaine=${lundiRes}`, { headers: await entetes() });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Erreur");
-        if (!annule) setResume(d);
-      } catch (e) { if (!annule) setErreur(e.message); }
-    })();
-    return () => { annule = true; };
-  }, [lundiRes]);
 
   // Saisie d'une semaine : { id, semaine, valeurs }
   const demarrer = (l, semaine = lundiDe(), source = null) => setEdition({
@@ -426,48 +410,6 @@ export default function AdminTableauPersonnel() {
               </div>
             );
           })}
-          <h2 style={{ fontSize: 16, margin: "28px 0 2px" }}>5. Résumé de la semaine</h2>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0 10px" }}>
-            <button onClick={() => setLundiRes(decalerSemaine(lundiRes, -1))} style={{ border: `1px solid ${ORANGE}`, background: "#fff", color: ORANGE, borderRadius: 6, padding: "6px 12px", cursor: "pointer" }}>‹</button>
-            <strong style={{ minWidth: 170, textAlign: "center", fontSize: 14 }}>{libelleSemaine(lundiRes)}{lundiRes === lundiDe() ? " (en cours)" : ""}</strong>
-            <button onClick={() => setLundiRes(decalerSemaine(lundiRes, 1))} disabled={lundiRes >= lundiDe()} style={{ border: `1px solid ${ORANGE}`, background: "#fff", color: ORANGE, borderRadius: 6, padding: "6px 12px", cursor: "pointer", opacity: lundiRes >= lundiDe() ? 0.4 : 1 }}>›</button>
-          </div>
-          {!resume && <p style={{ fontSize: 13, color: "#888" }}>Chargement…</p>}
-          {resume && [...resume.personnel].sort((a, b) => (a.id === resume.moi ? -1 : b.id === resume.moi ? 1 : 0)).map((l) => {
-            const r = l.remuneration;
-            const mien = l.id === resume.moi;
-            const manques = Object.values(r.missions).flatMap((x) => x.details.filter((d) => d.ecart < 0)).length;
-            const excedents = Object.values(r.missions).flatMap((x) => x.details.filter((d) => d.ecart > 0)).length;
-            return (
-              <div key={l.id} style={{ background: "#fff", borderRadius: 10, padding: 14, marginBottom: 12, border: mien ? `2px solid ${ORANGE}` : "1px solid #eee" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
-                  <strong>{l.nom}{mien ? " (moi)" : ""}</strong>
-                  <b style={{ color: ORANGE }}>{fmt(r.total)} / {fmt(r.max)} points · {r.pct} %</b>
-                </div>
-                <div style={{ fontSize: 12, margin: "4px 0 8px" }}>
-                  <span style={{ color: manques ? "#c0392b" : "#1e8e3e", fontWeight: 700 }}>{manques ? `${manques} point(s) en manque` : "Aucun manque"}</span>
-                  {" · "}<span style={{ color: excedents ? "#1e8e3e" : "#888", fontWeight: 700 }}>{excedents ? `${excedents} excédent(s)` : "aucun excédent"}</span>
-                </div>
-                {Object.entries(r.missions).map(([m, x]) => (
-                  <div key={m} style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: x.pct < 100 ? "#c0392b" : "#1e8e3e" }}>{NOMS_MISSIONS[m]} — {x.pct} %{x.surplus > 0 ? ` (excédent +${x.surplus} %)` : ""}</div>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <tbody>
-                        {x.details.map((d) => (
-                          <tr key={d.libelle} style={{ background: d.ecart < 0 ? "#FFF1F0" : d.ecart > 0 ? "#EEF8F0" : undefined }}>
-                            <td style={{ ...td, whiteSpace: "normal", padding: "4px 6px" }}>{d.libelle}</td>
-                            <td style={{ ...td, padding: "4px 6px", textAlign: "right" }}>{fmt(d.fait)} / {fmt(d.cible)}</td>
-                            <td style={{ ...td, padding: "4px 6px", textAlign: "right", fontWeight: 700, color: d.ecart < 0 ? "#c0392b" : "#1e8e3e" }}>{d.ecart < 0 ? `manque ${fmt(-d.ecart)}` : d.ecart > 0 ? `excédent +${fmt(d.ecart)}` : "atteint ✓"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-          {resume && MESSAGE_PAIE}
         </>
       )}
     </div>
