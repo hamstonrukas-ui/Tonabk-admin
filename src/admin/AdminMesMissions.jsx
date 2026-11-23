@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { API_URL } from "../lib/api";
+import MonResumeSemaine from "./MonResumeSemaine";
 
 async function authHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -80,6 +81,8 @@ export default function AdminMesMissions() {
   return (
     <div style={{ maxWidth: 560 }}>
       <h1 style={{ marginBottom: 4 }}>Mes missions</h1>
+
+      <MonResumeSemaine />
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "8px 0 16px" }}>
         <button onClick={() => setSemaine(decaler(semaine, -7))} style={{ padding: "8px 12px" }}>←</button>
