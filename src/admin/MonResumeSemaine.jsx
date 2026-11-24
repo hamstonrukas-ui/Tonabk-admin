@@ -24,6 +24,7 @@ export default function MonResumeSemaine() {
   const [lundi, setLundi] = useState(lundiLocal());
   const [moi, setMoi] = useState(null);
   const [erreur, setErreur] = useState("");
+  const [copie, setCopie] = useState(false);
 
   useEffect(() => {
     let annule = false;
@@ -40,12 +41,35 @@ export default function MonResumeSemaine() {
     return () => { annule = true; };
   }, [lundi]);
 
+  const code = moi?.sensibilisation?.code;
+  const lien = code ? `https://www.tonabk.com/${code}` : null;
+  const copier = async () => {
+    try { await navigator.clipboard.writeText(lien); setCopie(true); setTimeout(() => setCopie(false), 2000); }
+    catch { window.prompt("Copiez votre lien :", lien); }
+  };
   const r = moi?.remuneration;
   const manques = r ? Object.values(r.missions).flatMap((x) => x.details.filter((d) => d.ecart < 0)).length : 0;
   const excedents = r ? Object.values(r.missions).flatMap((x) => x.details.filter((d) => d.ecart > 0)).length : 0;
 
   return (
     <div style={{ background: "#fff", border: `2px solid ${ORANGE}`, borderRadius: 12, padding: 14, margin: "10px 0 18px" }}>
+      {moi !== null && (
+        <div style={{ background: "#FFF6EE", border: `1px dashed ${ORANGE}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Mon lien à donner aux personnes rencontrées</div>
+          {lien ? (
+            <>
+              <a href={lien} target="_blank" rel="noreferrer" style={{ color: ORANGE, fontWeight: 800, fontSize: 16, wordBreak: "break-all" }}>tonabk.com/{code}</a>
+              <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={copier} style={{ background: ORANGE, color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", fontWeight: 700, cursor: "pointer" }}>{copie ? "Copié ✓" : "Copier mon lien"}</button>
+                <a href={`https://wa.me/?text=${encodeURIComponent(`Découvrez TonaBk, le grand marché du Kivu : ${lien}`)}`} target="_blank" rel="noreferrer" style={{ background: "#25D366", color: "#fff", borderRadius: 6, padding: "7px 12px", fontWeight: 700, textDecoration: "none" }}>Envoyer sur WhatsApp</a>
+              </div>
+              <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>Chaque personne qui ouvre ce lien est comptée pour vous (un téléphone = une seule fois).</div>
+            </>
+          ) : (
+            <div style={{ fontSize: 13, color: "#888" }}>Votre lien n'a pas encore été créé. Demandez-le à l'administrateur principal.</div>
+          )}
+        </div>
+      )}
       <strong style={{ fontSize: 15 }}>Mon résumé de la semaine</strong>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "8px 0" }}>
         <button onClick={() => setLundi(decaler(lundi, -1))} style={{ padding: "6px 12px" }}>←</button>
