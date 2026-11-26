@@ -20,6 +20,7 @@ export default function AdminLivraisons() {
   const [choix, setChoix] = useState({}); // livreur choisi (pas encore validé) pour chaque commande
   const [enCours, setEnCours] = useState(null); // commande en cours d'assignation
   const [message, setMessage] = useState("");
+  const [recherche, setRecherche] = useState("");
   const watchId = useRef(null);
   const dernierEnvoi = useRef(0);
   const livraisonsRef = useRef([]);
@@ -110,6 +111,12 @@ export default function AdminLivraisons() {
     if (!livraisons.some((l) => l.statut === "en_route")) arreterPartage();
   }, [livraisons]);
 
+  const q = recherche.trim().toLowerCase();
+  const listeFiltree = !q ? livraisons : livraisons.filter((l) =>
+    [String(l.id).slice(0, 8), l.nom_produit, l.client_nom, l.client_telephone, l.client_adresse]
+      .some((v) => String(v || "").toLowerCase().includes(q))
+  );
+
   return (
     <div style={{ maxWidth: 560 }}>
       <h1>{complet ? "Livraisons" : "Mes livraisons"}</h1>
@@ -121,16 +128,28 @@ export default function AdminLivraisons() {
         </p>
       )}
 
+      <input
+        value={recherche}
+        onChange={(e) => setRecherche(e.target.value)}
+        placeholder="🔍 Référence, nom, téléphone ou produit"
+        style={{ width: "100%", boxSizing: "border-box", padding: 10, marginBottom: 12, border: "1px solid #ddd", borderRadius: 8, fontSize: 14 }}
+      />
+
       {livraisons.length === 0 && !erreur && (
         <p style={{ color: "#999" }}>{complet ? "Aucune commande de livraison." : "Aucune livraison assignée pour l'instant."}</p>
       )}
 
-      {livraisons.map((l) => (
+      {recherche.trim() && listeFiltree.length === 0 && livraisons.length > 0 && (
+        <p style={{ color: "#999" }}>Aucune livraison ne correspond à « {recherche} ».</p>
+      )}
+
+      {listeFiltree.map((l) => (
         <div key={l.id} style={{ background: "#fff", borderRadius: 10, padding: 14, marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <strong>{l.nom_produit}</strong>
             <span style={{ fontSize: 12, color: "#F5720C", fontWeight: 700 }}>{LIBELLES[l.statut]}</span>
           </div>
+          <p style={{ margin: "2px 0", fontSize: 11, color: "#999" }}>Réf. {String(l.id).slice(0, 8)}</p>
           <p style={{ margin: "4px 0", fontSize: 13 }}>{fmt(l.prix, l.devise)} — à encaisser à la livraison</p>
           <p style={{ margin: "4px 0", fontSize: 12, color: "#666" }}>👤 {l.client_nom} · 📞 {l.client_telephone}</p>
           <p style={{ margin: "4px 0", fontSize: 12, color: "#666" }}>📍 {l.client_adresse}</p>
